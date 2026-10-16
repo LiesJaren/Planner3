@@ -94,7 +94,7 @@ export const KidsModeView: React.FC<KidsModeViewProps> = ({
     (r) =>
       (!r.targetMemberId || r.targetMemberId === 'all' || (selectedKid && r.targetMemberId === selectedKid.id)) &&
       r.status !== 'redeemed' &&
-      selectedKidStars >= r.starCost
+      selectedKidStars >= (r.starCost ?? r.starsCost ?? 5)
   ).length;
 
   const handleSpeakItem = (title: string, time: string, id: string) => {
@@ -643,7 +643,7 @@ const KidEventTile: React.FC<KidEventTileProps> = ({
     >
       {/* Big Visual Icon */}
       <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-amber-100/70 border-2 border-amber-300 flex items-center justify-center text-4xl sm:text-5xl shrink-0 shadow-2xs">
-        <IconVisual emoji={event.iconEmoji} imageDataUrl={event.iconImageDataUrl} imageClassName="w-12 h-12 object-contain" />
+        <IconVisual emoji={event.iconEmoji || event.icon || '⭐'} imageDataUrl={event.iconImageDataUrl} imageClassName="w-12 h-12 object-contain" />
       </div>
 
       <div className="flex-1 min-w-0">

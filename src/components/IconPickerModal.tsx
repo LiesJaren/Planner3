@@ -58,7 +58,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
         const normTag = normalizeText(activeTag);
         matchesTag = !!(
           (icon.tags && icon.tags.some((t) => normalizeText(t).includes(normTag))) ||
-          normalizeText(icon.categoryLabel).includes(normTag) ||
+          normalizeText(icon.categoryLabel || '').includes(normTag) ||
           normalizeText(icon.category).includes(normTag)
         );
       }
@@ -67,7 +67,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
       const matchesSearch =
         !normQuery ||
         normalizeText(icon.label).includes(normQuery) ||
-        normalizeText(icon.categoryLabel).includes(normQuery) ||
+        normalizeText(icon.categoryLabel || '').includes(normQuery) ||
         (icon.tags &&
           icon.tags.some((t) => normalizeText(t).includes(normQuery)));
 
@@ -331,7 +331,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                         </span>
                       ) : (
                         <span className="text-slate-400 font-semibold truncate max-w-[80px]">
-                          {icon.categoryLabel.split(' ')[0]}
+                          {(icon.categoryLabel || icon.category || '').split(' ')[0]}
                         </span>
                       )}
 

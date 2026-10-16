@@ -27,7 +27,7 @@ interface CreateIconModalProps {
 }
 
 const EMOJI_SETS_BY_CATEGORY: Record<string, string[]> = {
-  sport: ['⚽', '🏀', '🎾', '🏐', '🏉', '🏑', '🏸', '🏓', '🥊', '🥋', '🛹', '🛼', '⛸️', '🤸', '🧗', '🏄', '🏃', '🚴', '🏊', '🐴', '🩰', '🥇', '🏹', '🎳'],
+  sport: ['⚽', '🏀', '🎾', '🏐', '🏑', '🏸', '🏓', '🥊', '🥋', '🛹', '🛼', '⛸️', '🤸', '🧗', '🏄', '🏃', '🚴', '🏊', '🐴', '🩰', '🥇', '🏹', '🎳'],
   school: ['🎒', '🏫', '📚', '📖', '📝', '✏️', '✍️', '📐', '📏', '🔢', '🏛️', '🔬', '🔭', '🧪', '🚌', '🧩', '🗣️', '💻', '💡', '🎓'],
   eten: ['🍽️', '🥣', '🥪', '🥞', '🍕', '🍔', '🍟', '🌮', '🍝', '🍣', '🍎', '🍌', '🍓', '🍇', '🥑', '🥕', '🍦', '🍩', '🍪', '🍰', '🍿', '🧋', '🧃', '🍢', '🛒'],
   muziek: ['🎵', '🎶', '🎸', '🎹', '🥁', '🎺', '🎷', '🎻', '🎤', '🎧', '🪗', '🪕', '📻'],
@@ -48,7 +48,7 @@ const ALL_POPULAR_EMOJIS = [
   '⚽', '🏀', '🎾', '🏊', '🥋', '🩰', '🐴', '🛹', '⛸️', '🧗',
   '🎒', '📚', '📝', '🏫', '🎨', '✂️', '🧱', '🎸', '🎹', '🥁',
   '🎤', '🍽️', '🥞', '🍕', '🍎', '🍦', '🍪', '🐕', '🐈', '🐾',
-  '🎉', '🎂', '🎁', '🍿', '🎡', '🩺', '🦷', '✂️', '👵', '🛝',
+  '🎉', '🎂', '🎁', '🍿', '🎡', '🩺', '🦷', '🩹', '👵', '🛝',
   '🏖️', '🌲', '⛺', '🎮', '📱', '🤖', '🧹', '🪴', '✈️', '🚗',
   '🛏️', '⏰', '🧸', '⭐', '🌈', '☀️', '❤️', '✨'
 ];
@@ -738,9 +738,9 @@ export const CreateIconModal: React.FC<CreateIconModalProps> = ({
                     Passend bij categorie {currentCategoryMeta?.name}:
                   </span>
                   <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-2xl border border-slate-200 max-h-24 overflow-y-auto">
-                    {categorySpecificEmojis.map((em) => (
+                    {categorySpecificEmojis.map((em, idx) => (
                       <button
-                        key={em}
+                        key={`cat-em-${em}-${idx}`}
                         type="button"
                         onClick={() => {
                           soundEffects.playTap();
@@ -765,9 +765,9 @@ export const CreateIconModal: React.FC<CreateIconModalProps> = ({
                     Alle populaire symbolen:
                   </span>
                   <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 rounded-2xl border border-slate-200 max-h-24 overflow-y-auto">
-                    {ALL_POPULAR_EMOJIS.map((em) => (
+                    {ALL_POPULAR_EMOJIS.map((em, idx) => (
                       <button
-                        key={em}
+                        key={`pop-em-${em}-${idx}`}
                         type="button"
                         onClick={() => {
                           soundEffects.playTap();
@@ -917,9 +917,9 @@ export const CreateIconModal: React.FC<CreateIconModalProps> = ({
                     '📁', '🩰', '⛺', '🎨', '🎵', '⚽', '🏊', '🚴', '🐴', '🐕',
                     '🧁', '🎉', '🩺', '📚', '🎒', '🎮', '🧹', '✈️', '🌟', '❤️',
                     '💎', '🚀', '🌲', '🎪', '🏰', '🧩', '🎳', '🏆', '🎯', '🕯️'
-                  ].map((em) => (
+                  ].map((em, idx) => (
                     <button
-                      key={em}
+                      key={`newcat-em-${em}-${idx}`}
                       type="button"
                       onClick={() => {
                         soundEffects.playTap();

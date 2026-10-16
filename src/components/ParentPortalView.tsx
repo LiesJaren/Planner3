@@ -125,7 +125,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
 
   // Selected reward for 5-star milestone redemption
   const fiveStarRewards = useMemo(() => {
-    return rewards.filter((r) => r.starCost <= 5 && r.status !== 'redeemed');
+    return rewards.filter((r) => (r.starCost ?? r.starsCost ?? 5) <= 5 && r.status !== 'redeemed');
   }, [rewards]);
 
   const [selectedRewardToGrant, setSelectedRewardToGrant] = useState<string>(
@@ -178,7 +178,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
       const matchQuery =
         !q ||
         ic.label.toLowerCase().includes(q) ||
-        ic.categoryLabel.toLowerCase().includes(q) ||
+        (ic.categoryLabel || '').toLowerCase().includes(q) ||
         (ic.tags && ic.tags.some((t) => t.toLowerCase().includes(q)));
       return matchCat && matchQuery;
     });
@@ -207,7 +207,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
         const q = eventSearch.toLowerCase().trim();
         const matchesTitle = ev.title.toLowerCase().includes(q);
         const matchesLocation = ev.location?.toLowerCase().includes(q);
-        const matchesIcon = ev.iconLabel.toLowerCase().includes(q);
+        const matchesIcon = (ev.iconLabel || '').toLowerCase().includes(q);
         if (!matchesTitle && !matchesLocation && !matchesIcon) return false;
       }
 
@@ -1090,7 +1090,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                       className="p-3.5 rounded-2xl border border-slate-200 hover:border-amber-300 bg-white hover:bg-amber-50/20 transition-all flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <IconVisual emoji={ev.iconEmoji} imageDataUrl={ev.iconImageDataUrl} className="text-3xl shrink-0" imageClassName="w-10 h-10 object-contain" />
+                        <IconVisual emoji={ev.iconEmoji || ev.icon || '⭐'} imageDataUrl={ev.iconImageDataUrl} className="text-3xl shrink-0" imageClassName="w-10 h-10 object-contain" />
                         <div className="min-w-0 space-y-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-black text-slate-900 truncate">

@@ -56,7 +56,7 @@ export const EventModal: React.FC<EventModalProps> = ({
       setDate(initialEvent.date);
       setStartTime(initialEvent.startTime || '14:00');
       setEndTime(initialEvent.endTime || '');
-      setSelectedIconId(initialEvent.iconId);
+      setSelectedIconId(initialEvent.iconId || 'schooltas');
       setSelectedMemberIds(initialEvent.memberIds || []);
       setTimeOfDay(initialEvent.timeOfDay || 'middag');
       setLocation(initialEvent.location || '');

@@ -279,7 +279,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
           id: `ev_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           title: act.title,
           date: dStr,
-          startTime: act.startTime,
+          startTime: act.startTime || act.time || '08:00',
           endTime: act.endTime,
           iconId: act.iconId,
           iconEmoji: act.iconEmoji,
@@ -355,13 +355,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
   const handleEditExistingRoutine = (template: RoutineTemplate) => {
     soundEffects.playTap();
     setEditingRoutineId(template.id);
-    setRoutineFormName(template.name);
-    setRoutineFormEmoji(template.emoji);
+    setRoutineFormName(template.name || template.title || '');
+    setRoutineFormEmoji(template.emoji || template.icon || '⭐');
     setRoutineFormIconId(template.id);
-    setRoutineFormDesc(template.description);
-    setRoutineFormCategory(template.category);
-    setRoutineFormSuggestedDays(template.suggestedDays || '');
-    setRoutineFormTargetRole(template.targetMemberRole || 'kind');
+    setRoutineFormDesc(template.description || '');
+    setRoutineFormCategory(template.category || 'dagelijks');
+    setRoutineFormSuggestedDays(Array.isArray(template.suggestedDays) ? template.suggestedDays.join(',') : (template.suggestedDays || ''));
+    setRoutineFormTargetRole((template.targetMemberRole as "all" | Role) || 'kind');
     setBuilderActivities([...template.activities]);
     resetActivityForm();
     setModalMode('create');
@@ -370,13 +370,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
   const handleDuplicateRoutine = (template: RoutineTemplate) => {
     soundEffects.playTap();
     setEditingRoutineId(null);
-    setRoutineFormName(`${template.name} (Kopie)`);
-    setRoutineFormEmoji(template.emoji);
+    setRoutineFormName(`${template.name || template.title || 'Routine'} (Kopie)`);
+    setRoutineFormEmoji(template.emoji || template.icon || '⭐');
     setRoutineFormIconId(template.id);
-    setRoutineFormDesc(template.description);
-    setRoutineFormCategory(template.category);
-    setRoutineFormSuggestedDays(template.suggestedDays || '');
-    setRoutineFormTargetRole(template.targetMemberRole || 'kind');
+    setRoutineFormDesc(template.description || '');
+    setRoutineFormCategory(template.category || 'dagelijks');
+    setRoutineFormSuggestedDays(Array.isArray(template.suggestedDays) ? template.suggestedDays.join(',') : (template.suggestedDays || ''));
+    setRoutineFormTargetRole((template.targetMemberRole as "all" | Role) || 'kind');
     setBuilderActivities(
       template.activities.map((act) => ({
         ...act,
@@ -405,15 +405,15 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     soundEffects.playTap();
     setEditingActivityId(act.id);
     setActFormTitle(act.title);
-    setActFormStartTime(act.startTime);
+    setActFormStartTime(act.startTime || act.time || '08:00');
     setActFormEndTime(act.endTime || '');
-    setActFormEmoji(act.iconEmoji);
+    setActFormEmoji(act.iconEmoji || act.icon || '⭐');
     setActFormImageDataUrl(act.iconImageDataUrl);
     setActFormImageUrl(act.iconImageUrl);
-    setActFormIconId(act.iconId);
-    setActFormIconLabel(act.iconLabel);
+    setActFormIconId(act.iconId || act.icon || 'ic_star');
+    setActFormIconLabel(act.iconLabel || act.title || 'Activiteit');
     setActFormNotes(act.notes || '');
-    setActFormTimeOfDay(act.timeOfDay);
+    setActFormTimeOfDay(act.timeOfDay || 'ochtend');
   };
 
   const handleSaveActivityToBuilder = () => {
@@ -1103,9 +1103,9 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                     Of kies snel een emoji:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {QUICK_EMOJIS.map((emoji) => (
+                    {QUICK_EMOJIS.map((emoji, idx) => (
                       <button
-                        key={emoji}
+                        key={`quick-${emoji}-${idx}`}
                         type="button"
                         onClick={() => setRoutineFormEmoji(emoji)}
                         className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-transform hover:scale-110 cursor-pointer ${
