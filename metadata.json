@@ -1,0 +1,6 @@
+{
+  "name": "FamiliePlanner - Vrolijke Familie Agenda",
+  "description": "Vrolijke familie-agenda en gedeeld boodschappenlijstje met herkenbare iconen voor het hele gezin en Google Agenda synchronisatie.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
