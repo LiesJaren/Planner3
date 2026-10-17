@@ -62,6 +62,22 @@ const INITIAL_REWARDS: Reward[] = [
   { id: 'r4', title: 'Middagje binnenspeeltuin of zwemparadijs', icon: '🎪', emoji: '🎪', starsCost: 10, starCost: 10, description: 'Klimmen, klauteren en glijden', status: 'available' },
 ];
 
+function loadStoredArray<T>(key: string, legacyKey?: string): T[] | null {
+  const keys = legacyKey ? [key, legacyKey] : [key];
+  for (const storageKey of keys) {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved === null) continue;
+      const parsed: unknown = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed as T[];
+      console.warn(`Ignoring invalid saved data for ${storageKey}: expected an array`);
+    } catch (error) {
+      console.warn(`Could not load saved data for ${storageKey}:`, error);
+    }
+  }
+  return null;
+}
+
 export default function App() {
   const today = getTodayDateStr();
   const monday = getWeekMonday(today);
@@ -70,19 +86,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'agenda' | 'kids' | 'ouders' | 'boodschappen'>('agenda');
 
   const [members, setMembers] = useState<FamilyMember[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_members');
-      return saved ? JSON.parse(saved) : DEFAULT_MEMBERS;
-    } catch {
-      return DEFAULT_MEMBERS;
-    }
+    return loadStoredArray<FamilyMember>('fp_members', 'familieplanner_members_v2') ?? DEFAULT_MEMBERS;
   });
 
   const [events, setEvents] = useState<AgendaEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_events');
-      if (saved) return JSON.parse(saved);
-    } catch {}
+    const savedEvents = loadStoredArray<AgendaEvent>('fp_events', 'familieplanner_events_v2');
+    if (savedEvents) return savedEvents;
 
     // Seed realistic initial events around current week
     return [
@@ -155,39 +164,19 @@ export default function App() {
   });
 
   const [groceries, setGroceries] = useState<GroceryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_groceries');
-      return saved ? JSON.parse(saved) : INITIAL_GROCERIES;
-    } catch {
-      return INITIAL_GROCERIES;
-    }
+    return loadStoredArray<GroceryItem>('fp_groceries', 'familieplanner_groceries_v2') ?? INITIAL_GROCERIES;
   });
 
   const [rewards, setRewards] = useState<Reward[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_rewards');
-      return saved ? JSON.parse(saved) : INITIAL_REWARDS;
-    } catch {
-      return INITIAL_REWARDS;
-    }
+    return loadStoredArray<Reward>('fp_rewards', 'familieplanner_rewards_v2') ?? INITIAL_REWARDS;
   });
 
   const [customIcons, setCustomIcons] = useState<ActivityIcon[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_custom_icons');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return loadStoredArray<ActivityIcon>('fp_custom_icons', 'familieplanner_custom_icons_v2') ?? [];
   });
 
   const [customCategories, setCustomCategories] = useState<IconCategoryMeta[]>(() => {
-    try {
-      const saved = localStorage.getItem('fp_custom_categories');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return loadStoredArray<IconCategoryMeta>('fp_custom_categories', 'familieplanner_custom_cats_v2') ?? [];
   });
 
   // Local storage auto sync
@@ -199,7 +188,9 @@ export default function App() {
       localStorage.setItem('fp_rewards', JSON.stringify(rewards));
       localStorage.setItem('fp_custom_icons', JSON.stringify(customIcons));
       localStorage.setItem('fp_custom_categories', JSON.stringify(customCategories));
-    } catch {}
+    } catch (error) {
+      console.warn('Could not save planner data to local storage:', error);
+    }
   }, [members, events, groceries, rewards, customIcons, customCategories]);
 
   // Modal Control States
