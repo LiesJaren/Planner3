@@ -39,6 +39,7 @@ import { IconPickerModal } from './components/IconPickerModal';
 import { soundEffects, spreekBericht } from './utils/audio';
 import { getTodayDateStr, addDays, getWeekMonday } from './utils/dateUtils';
 import { ACTIVITY_ICONS } from './data/iconLibrary';
+import familyBannerImg from './assets/images/family_banner.jpg';
 
 const DEFAULT_MEMBERS: FamilyMember[] = [
   { id: 'm1', name: 'Papa Birger', role: 'ouder', color: '#3b82f6', avatar: '👨' },
@@ -516,6 +517,27 @@ export default function App() {
 
       {/* Main App Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+        <section className="relative mb-6 overflow-hidden rounded-3xl border-2 border-amber-300 bg-slate-900 shadow-lg">
+          <div className="relative h-48 w-full overflow-hidden sm:h-60 md:h-72">
+            <img
+              src={familyBannerImg}
+              alt="Familie Birger, Lieselot en Jaren"
+              className="h-full w-full object-cover object-[center_30%]"
+            />
+            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent p-5 sm:p-7">
+              <span className="mb-2 inline-flex w-fit items-center rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-slate-950 shadow-sm">
+                FamiliePlanner • Birger, Lieselot & Jaren
+              </span>
+              <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-md sm:text-3xl md:text-4xl">
+                Welkom bij onze Gezinsagenda
+              </h2>
+              <p className="mt-1.5 max-w-xl text-xs font-medium text-slate-200 drop-shadow-sm sm:text-sm">
+                Samen maken we er elke dag een succes van! 🎒⚽⭐
+              </p>
+            </div>
+          </div>
+        </section>
+
         {activeTab === 'agenda' && (
           <AgendaView
             events={events}
