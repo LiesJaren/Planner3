@@ -58,7 +58,7 @@ interface AgendaViewProps {
   onClearDayEvents?: (dateStr: string) => void;
   onToggleComplete: (eventId: string) => void;
   onOpenPrintModal?: (dateStr?: string, scope?: 'week' | 'day') => void;
-  onOpenInsertRoutineModal?: (dateStr?: string) => void;
+  onOpenInsertRoutineModal?: (dateStr?: string, templateId?: string, mode?: 'insert' | 'create') => void;
   onOpenCopyModal?: (sourceDateStr?: string, eventId?: string) => void;
   onBatchInsertEvents?: (newEvents: AgendaEvent[]) => void;
 }

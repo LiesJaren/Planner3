@@ -104,26 +104,58 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
   // Modal Mode: 'insert' or 'create' (or 'edit')
   const [modalMode, setModalMode] = useState<'insert' | 'create'>(initialMode);
 
-  // All templates combined (defaults + customs)
-  const allTemplates = useMemo(() => {
-    return [...customTemplates, ...DEFAULT_ROUTINES];
+  // Local state for custom templates to guarantee immediate reactivity upon save/delete
+  const [localCustomTemplates, setLocalCustomTemplates] = useState<RoutineTemplate[]>(() => {
+    if (customTemplates && customTemplates.length > 0) return customTemplates;
+    try {
+      const saved = localStorage.getItem('fp_custom_templates');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  // Keep localCustomTemplates synced if parent passes new customTemplates
+  useEffect(() => {
+    if (customTemplates && customTemplates.length > 0) {
+      setLocalCustomTemplates(customTemplates);
+    }
   }, [customTemplates]);
+
+  // All templates combined (customs first + defaults)
+  const allTemplates = useMemo(() => {
+    const customs = localCustomTemplates.length > 0 ? localCustomTemplates : customTemplates;
+    return [...customs, ...DEFAULT_ROUTINES];
+  }, [localCustomTemplates, customTemplates]);
 
   // Selected template for insertion
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
-    initialTemplateId || allTemplates[0]?.id || 'rt_ochtend_school'
+    initialTemplateId || (allTemplates.length > 0 ? allTemplates[0].id : 'ochtend_schooldag')
   );
 
   const selectedTemplate = useMemo(() => {
     return allTemplates.find((t) => t.id === selectedTemplateId) || allTemplates[0];
   }, [allTemplates, selectedTemplateId]);
 
-  // Reset selectedTemplateId if initialTemplateId changes
+  // Sync mode and selectedTemplateId when modal opens or initial props change
   useEffect(() => {
-    if (initialTemplateId) {
-      setSelectedTemplateId(initialTemplateId);
+    if (isOpen) {
+      if (initialMode) {
+        setModalMode(initialMode);
+      }
+      if (initialTemplateId) {
+        setSelectedTemplateId(initialTemplateId);
+      } else if (!allTemplates.some((t) => t.id === selectedTemplateId)) {
+        if (allTemplates[0]) {
+          setSelectedTemplateId(allTemplates[0].id);
+        }
+      }
     }
-  }, [initialTemplateId]);
+  }, [isOpen, initialMode, initialTemplateId]);
 
   // Target Date selection using accurate local dates
   const todayStr = useMemo(() => getTodayDateStr(), []);
@@ -258,12 +290,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
   };
 
   // Submit and batch insert
-  const handleInsert = () => {
-    if (!selectedTemplate) return;
+  const handleInsert = (templateOverride?: RoutineTemplate) => {
+    const tmpl = templateOverride || selectedTemplate;
+    if (!tmpl) return;
 
-    const chosenActivities = selectedTemplate.activities.filter((a) =>
-      activeActivityIds.includes(a.id)
-    );
+    const chosenActivities = templateOverride
+      ? tmpl.activities
+      : tmpl.activities.filter((a) => activeActivityIds.includes(a.id));
 
     if (chosenActivities.length === 0) {
       alert('Selecteer minimaal 1 activiteit uit de routine om in te voegen.');
@@ -282,12 +315,12 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
           startTime: act.startTime || act.time || '08:00',
           endTime: act.endTime,
           iconId: act.iconId,
-          iconEmoji: act.iconEmoji,
+          iconEmoji: act.iconEmoji || act.icon,
           iconImageDataUrl: act.iconImageDataUrl,
           iconImageUrl: act.iconImageUrl,
           iconLabel: act.iconLabel,
           memberIds: selectedMemberIds,
-          timeOfDay: act.timeOfDay,
+          timeOfDay: act.timeOfDay || (tmpl.dagdeel as TimeOfDay) || 'ochtend',
           notes: act.notes,
           isRoutine: act.isRoutine ?? true,
           completed: false,
@@ -306,7 +339,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
 
     onBatchInsertEvents(newEvents);
     spreekBericht(
-      `Hoera! De routine "${selectedTemplate.name}" is met ${newEvents.length} activiteiten ingepland!`
+      `Hoera! De routine "${tmpl.name || tmpl.title || 'Routine'}" is met ${newEvents.length} activiteiten ingepland!`
     );
     onClose();
   };
@@ -563,14 +596,43 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     const newTemplate: RoutineTemplate = {
       id: templateId,
       name: routineFormName.trim(),
+      title: routineFormName.trim(),
       description: routineFormDesc.trim() || `Zelfgemaakte routine met ${builderActivities.length} activiteiten`,
       emoji: routineFormEmoji || '⭐',
+      icon: routineFormEmoji || '⭐',
       category: routineFormCategory as any,
+      dagdeel: (['ochtend', 'middag', 'avond'].includes(routineFormCategory) ? routineFormCategory : 'ochtend') as TimeOfDay,
       suggestedDays: routineFormSuggestedDays.trim() || undefined,
       targetMemberRole: routineFormTargetRole,
-      activities: builderActivities,
+      activities: builderActivities.map((act) => ({
+        ...act,
+        startTime: act.startTime || act.time || '08:00',
+        time: act.startTime || act.time || '08:00',
+        iconEmoji: act.iconEmoji || act.icon || '⭐',
+        icon: act.iconEmoji || act.icon || '⭐',
+        timeOfDay: act.timeOfDay || (['ochtend', 'middag', 'avond'].includes(routineFormCategory) ? (routineFormCategory as TimeOfDay) : 'ochtend'),
+        isRoutine: true,
+      })),
       isCustom: true,
     };
+
+    // Update local state immediately so allTemplates instantly contains newTemplate
+    setLocalCustomTemplates((prev) => {
+      const idx = prev.findIndex((t) => t.id === newTemplate.id);
+      let updated: RoutineTemplate[];
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = newTemplate;
+      } else {
+        updated = [newTemplate, ...prev];
+      }
+      try {
+        localStorage.setItem('fp_custom_templates', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not save to localStorage:', err);
+      }
+      return updated;
+    });
 
     if (onSaveCustomTemplate) {
       onSaveCustomTemplate(newTemplate);
@@ -579,12 +641,31 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     setSelectedTemplateId(newTemplate.id);
     soundEffects.playVictoryFanfare();
     confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
-    spreekBericht(`Routine "${newTemplate.name}" is opgeslagen in je bibliotheek!`);
+    spreekBericht(`Routine "${newTemplate.name || newTemplate.title}" is opgeslagen in je bibliotheek!`);
 
     if (autoInsertAfterSave) {
-      setModalMode('insert');
+      handleInsert(newTemplate);
     } else {
       setModalMode('insert');
+    }
+  };
+
+  const handleDeleteRoutine = (templateId: string) => {
+    soundEffects.playTap();
+    setLocalCustomTemplates((prev) => {
+      const updated = prev.filter((t) => t.id !== templateId);
+      try {
+        localStorage.setItem('fp_custom_templates', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not save to localStorage:', err);
+      }
+      return updated;
+    });
+    if (onDeleteCustomTemplate) {
+      onDeleteCustomTemplate(templateId);
+    }
+    if (selectedTemplateId === templateId) {
+      setSelectedTemplateId(DEFAULT_ROUTINES[0]?.id || '');
     }
   };
 
@@ -707,7 +788,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                         <div>
                           <div className="flex items-start justify-between gap-2">
                             <span className="text-2xl p-1 bg-white rounded-xl border border-slate-100 shrink-0 shadow-2xs">
-                              {template.emoji}
+                              {template.emoji || template.icon || '⭐'}
                             </span>
                             <div className="flex items-center gap-1">
                               {template.isCustom && (
@@ -722,7 +803,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                           </div>
 
                           <h3 className="text-xs font-black text-slate-900 mt-2 line-clamp-1">
-                            {template.name}
+                            {template.name || template.title || 'Naamloze routine'}
                           </h3>
                           <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">
                             {template.description}
@@ -756,13 +837,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                             >
                               <Copy className="w-3 h-3" />
                             </button>
-                            {template.isCustom && onDeleteCustomTemplate && (
+                            {template.isCustom && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (window.confirm(`Routine "${template.name}" verwijderen?`)) {
-                                    onDeleteCustomTemplate(template.id);
+                                  if (window.confirm(`Routine "${template.name || template.title}" verwijderen?`)) {
+                                    handleDeleteRoutine(template.id);
                                   }
                                 }}
                                 className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
@@ -784,7 +865,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                      <span>{selectedTemplate.emoji}</span>
+                      <span>{selectedTemplate.emoji || selectedTemplate.icon || '⭐'}</span>
                       <span>Activiteiten in dit pakket ({activeActivityIds.length} geselecteerd):</span>
                     </span>
                     <div className="flex items-center gap-2">
@@ -832,7 +913,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                             >
                               {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                             </div>
-                            <IconVisual emoji={act.iconEmoji} imageDataUrl={act.iconImageDataUrl} imageUrl={act.iconImageUrl} className="text-xl shrink-0" imageClassName="w-6 h-6 object-contain" />
+                            <IconVisual emoji={act.iconEmoji || act.icon} imageDataUrl={act.iconImageDataUrl} imageUrl={act.iconImageUrl} className="text-xl shrink-0" imageClassName="w-6 h-6 object-contain" />
                             <div className="min-w-0">
                               <span className="text-xs truncate block">
                                 {act.title}
@@ -847,7 +928,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
 
                           <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                             <Clock className="w-3 h-3 text-amber-600" />
-                            <span>{act.startTime}</span>
+                            <span>{act.startTime || act.time}</span>
                             {act.endTime && <span>- {act.endTime}</span>}
                           </div>
                         </div>

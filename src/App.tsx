@@ -180,6 +180,10 @@ export default function App() {
     return loadStoredArray<IconCategoryMeta>('fp_custom_categories', 'familieplanner_custom_cats_v2') ?? [];
   });
 
+  const [customTemplates, setCustomTemplates] = useState<RoutineTemplate[]>(() => {
+    return loadStoredArray<RoutineTemplate>('fp_custom_templates', 'familieplanner_custom_templates_v2') ?? [];
+  });
+
   // Local storage auto sync
   useEffect(() => {
     try {
@@ -189,10 +193,11 @@ export default function App() {
       localStorage.setItem('fp_rewards', JSON.stringify(rewards));
       localStorage.setItem('fp_custom_icons', JSON.stringify(customIcons));
       localStorage.setItem('fp_custom_categories', JSON.stringify(customCategories));
+      localStorage.setItem('fp_custom_templates', JSON.stringify(customTemplates));
     } catch (error) {
       console.warn('Could not save planner data to local storage:', error);
     }
-  }, [members, events, groceries, rewards, customIcons, customCategories]);
+  }, [members, events, groceries, rewards, customIcons, customCategories, customTemplates]);
 
   // Modal Control States
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -210,6 +215,8 @@ export default function App() {
 
   const [isInsertRoutineModalOpen, setIsInsertRoutineModalOpen] = useState(false);
   const [routineTargetDate, setRoutineTargetDate] = useState<string>(today);
+  const [routineInitialMode, setRoutineInitialMode] = useState<'insert' | 'create'>('insert');
+  const [routineInitialTemplateId, setRoutineInitialTemplateId] = useState<string | undefined>();
 
   const [isCreateIconModalOpen, setIsCreateIconModalOpen] = useState(false);
   const [isIconPickerModalOpen, setIsIconPickerModalOpen] = useState(false);
@@ -284,6 +291,33 @@ export default function App() {
     soundEffects.playVictoryFanfare();
     confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
     setEvents((prev) => [...prev, ...newEvents]);
+  };
+
+  const handleSaveCustomTemplate = (template: RoutineTemplate) => {
+    setCustomTemplates((prev) => {
+      const idx = prev.findIndex((t) => t.id === template.id);
+      let updated: RoutineTemplate[];
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = template;
+      } else {
+        updated = [template, ...prev];
+      }
+      return updated;
+    });
+  };
+
+  const handleDeleteCustomTemplate = (templateId: string) => {
+    soundEffects.playTap();
+    setCustomTemplates((prev) => prev.filter((t) => t.id !== templateId));
+  };
+
+  const handleOpenInsertRoutineModal = (dateStr?: string, templateId?: string, mode?: 'insert' | 'create') => {
+    soundEffects.playTap();
+    setRoutineTargetDate(dateStr || today);
+    setRoutineInitialTemplateId(templateId);
+    setRoutineInitialMode(mode || 'insert');
+    setIsInsertRoutineModalOpen(true);
   };
 
   // Handlers for Stars & Rewards
@@ -552,10 +586,7 @@ export default function App() {
               setPrintScope(scope || 'week');
               setIsPrintModalOpen(true);
             }}
-            onOpenInsertRoutineModal={(d) => {
-              setRoutineTargetDate(d || today);
-              setIsInsertRoutineModalOpen(true);
-            }}
+            onOpenInsertRoutineModal={handleOpenInsertRoutineModal}
             onOpenCopyModal={(d, evId) => {
               setCopySourceDate(d || today);
               setCopyEventId(evId);
@@ -613,10 +644,9 @@ export default function App() {
               setPrintScope('week');
               setIsPrintModalOpen(true);
             }}
-            onOpenInsertRoutineModal={(d) => {
-              setRoutineTargetDate(d || today);
-              setIsInsertRoutineModalOpen(true);
-            }}
+            customTemplates={customTemplates}
+            onOpenInsertRoutineModal={handleOpenInsertRoutineModal}
+            onDeleteCustomTemplate={handleDeleteCustomTemplate}
             onOpenCopyModal={(d, evId) => {
               setCopySourceDate(d || today);
               setCopyEventId(evId);
@@ -790,9 +820,20 @@ export default function App() {
         isOpen={isInsertRoutineModalOpen}
         defaultDate={routineTargetDate}
         members={members}
+        customTemplates={customTemplates}
+        initialMode={routineInitialMode}
+        initialTemplateId={routineInitialTemplateId}
         customIcons={customIcons}
+        customCategories={customCategories}
+        onOpenCreateIconModal={() => setIsCreateIconModalOpen(true)}
+        onSaveCustomTemplate={handleSaveCustomTemplate}
+        onDeleteCustomTemplate={handleDeleteCustomTemplate}
         onBatchInsertEvents={handleBatchInsertEvents}
-        onClose={() => setIsInsertRoutineModalOpen(false)}
+        onClose={() => {
+          setIsInsertRoutineModalOpen(false);
+          setRoutineInitialMode('insert');
+          setRoutineInitialTemplateId(undefined);
+        }}
       />
 
       <CreateIconModal

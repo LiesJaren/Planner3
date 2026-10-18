@@ -38,6 +38,7 @@ import {
   ActivityIcon,
   IconCategoryMeta,
   TimeOfDay,
+  RoutineTemplate,
 } from '../types/family';
 import { soundEffects, spreekBericht } from '../utils/audio';
 import { IconVisual } from './IconVisual';
@@ -52,6 +53,7 @@ interface ParentPortalViewProps {
   groceries: GroceryItem[];
   customIcons: ActivityIcon[];
   customCategories: IconCategoryMeta[];
+  customTemplates?: RoutineTemplate[];
   onAddEvent: (date?: string) => void;
   onEditEvent: (event: AgendaEvent) => void;
   onDeleteEvent: (eventId: string) => void;
@@ -65,8 +67,9 @@ interface ParentPortalViewProps {
   onUpdateMemberStars: (memberId: string, newStars: number) => void;
   onSaveCustomIcon: (newIcon: ActivityIcon) => void;
   onDeleteCustomIcon: (iconId: string) => void;
+  onDeleteCustomTemplate?: (templateId: string) => void;
   onOpenPrintModal: (dateStr?: string) => void;
-  onOpenInsertRoutineModal?: (dateStr?: string) => void;
+  onOpenInsertRoutineModal?: (dateStr?: string, templateId?: string, mode?: 'insert' | 'create') => void;
   onOpenCopyModal?: (sourceDateStr?: string, eventId?: string) => void;
   onOpenFamilySettings: () => void;
   onOpenCreateIconModal: () => void;
@@ -80,6 +83,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   groceries,
   customIcons,
   customCategories,
+  customTemplates = [],
   onAddEvent,
   onEditEvent,
   onDeleteEvent,
@@ -93,6 +97,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   onUpdateMemberStars,
   onSaveCustomIcon,
   onDeleteCustomIcon,
+  onDeleteCustomTemplate,
   onOpenPrintModal,
   onOpenInsertRoutineModal,
   onOpenCopyModal,
@@ -983,31 +988,57 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                 <>
                   <button
                     type="button"
-                    onClick={() => onOpenInsertRoutineModal(todayStr)}
+                    onClick={() => onOpenInsertRoutineModal(todayStr, 'ochtend_schooldag')}
                     className="px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-amber-100 text-slate-900 border border-amber-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
                   >
-                    <span>🌅 Ochtend Schooldag (5 taken in 1x)</span>
+                    <span>🎒 Ochtend Schooldag (5 taken)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenInsertRoutineModal(todayStr)}
+                    onClick={() => onOpenInsertRoutineModal(todayStr, 'avond_bedtijd')}
                     className="px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-amber-100 text-slate-900 border border-amber-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
                   >
-                    <span>🌙 Avond & Bedtijd (5 taken in 1x)</span>
+                    <span>🌙 Avond & Bedtijd (5 taken)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenInsertRoutineModal(todayStr)}
+                    onClick={() => onOpenInsertRoutineModal(todayStr, 'woensdagmiddag_club')}
                     className="px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-amber-100 text-slate-900 border border-amber-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
                   >
-                    <span>🏊 Woensdag Zwemles (4 taken in 1x)</span>
+                    <span>🎈 Woensdag Vrij (4 taken)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenInsertRoutineModal(todayStr)}
+                    onClick={() => onOpenInsertRoutineModal(todayStr, 'weekend_gezinsdag')}
                     className="px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-amber-100 text-slate-900 border border-amber-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
                   >
-                    <span>⚽ Zaterdag Sport & Weekend (4 taken in 1x)</span>
+                    <span>🥞 Weekend Gezinsdag (2 taken)</span>
+                  </button>
+
+                  {/* Zelfgemaakte routines van het gezin */}
+                  {customTemplates.map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => onOpenInsertRoutineModal(todayStr, tmpl.id)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-black bg-purple-50 hover:bg-purple-100 text-purple-950 border border-purple-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
+                      title={tmpl.description || tmpl.name || tmpl.title}
+                    >
+                      <span>{tmpl.emoji || tmpl.icon || '⭐'}</span>
+                      <span>{tmpl.name || tmpl.title} ({tmpl.activities.length} taken)</span>
+                      <span className="text-[9px] bg-purple-200 text-purple-900 px-1.5 py-0.5 rounded-full uppercase font-black">
+                        Eigen
+                      </span>
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenInsertRoutineModal(todayStr, undefined, 'create')}
+                    className="px-3.5 py-2 rounded-xl text-xs font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs flex items-center gap-1.5 hover:scale-101 active:scale-98 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Nieuwe Routine Maken</span>
                   </button>
                 </>
               ) : (
