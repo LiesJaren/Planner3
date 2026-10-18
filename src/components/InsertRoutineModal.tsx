@@ -188,6 +188,8 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
   const [routineFormName, setRoutineFormName] = useState('');
   const [routineFormEmoji, setRoutineFormEmoji] = useState('⭐');
   const [routineFormIconId, setRoutineFormIconId] = useState('ster');
+  const [routineFormImageDataUrl, setRoutineFormImageDataUrl] = useState<string | undefined>();
+  const [routineFormImageUrl, setRoutineFormImageUrl] = useState<string | undefined>();
   const [routineFormDesc, setRoutineFormDesc] = useState('');
   const [routineFormCategory, setRoutineFormCategory] = useState<string>('ochtend');
   const [routineFormSuggestedDays, setRoutineFormSuggestedDays] = useState('Ma t/m Vr');
@@ -351,6 +353,8 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     setRoutineFormName('');
     setRoutineFormEmoji('⭐');
     setRoutineFormIconId('ster');
+    setRoutineFormImageDataUrl(undefined);
+    setRoutineFormImageUrl(undefined);
     setRoutineFormDesc('');
     setRoutineFormCategory('ochtend');
     setRoutineFormSuggestedDays('Ma t/m Vr');
@@ -390,7 +394,9 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     setEditingRoutineId(template.id);
     setRoutineFormName(template.name || template.title || '');
     setRoutineFormEmoji(template.emoji || template.icon || '⭐');
-    setRoutineFormIconId(template.id);
+    setRoutineFormIconId(template.iconId || '');
+    setRoutineFormImageDataUrl(template.iconImageDataUrl);
+    setRoutineFormImageUrl(template.iconImageUrl);
     setRoutineFormDesc(template.description || '');
     setRoutineFormCategory(template.category || 'dagelijks');
     setRoutineFormSuggestedDays(Array.isArray(template.suggestedDays) ? template.suggestedDays.join(',') : (template.suggestedDays || ''));
@@ -405,7 +411,9 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     setEditingRoutineId(null);
     setRoutineFormName(`${template.name || template.title || 'Routine'} (Kopie)`);
     setRoutineFormEmoji(template.emoji || template.icon || '⭐');
-    setRoutineFormIconId(template.id);
+    setRoutineFormIconId(template.iconId || '');
+    setRoutineFormImageDataUrl(template.iconImageDataUrl);
+    setRoutineFormImageUrl(template.iconImageUrl);
     setRoutineFormDesc(template.description || '');
     setRoutineFormCategory(template.category || 'dagelijks');
     setRoutineFormSuggestedDays(Array.isArray(template.suggestedDays) ? template.suggestedDays.join(',') : (template.suggestedDays || ''));
@@ -551,6 +559,8 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
     } else if (iconPickerTarget === 'routine') {
       setRoutineFormEmoji(icon.emoji);
       setRoutineFormIconId(icon.id);
+      setRoutineFormImageDataUrl(icon.imageDataUrl);
+      setRoutineFormImageUrl(icon.imageUrl);
     } else {
       setActFormEmoji(icon.emoji);
       setActFormImageDataUrl(icon.imageDataUrl);
@@ -600,6 +610,9 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
       description: routineFormDesc.trim() || `Zelfgemaakte routine met ${builderActivities.length} activiteiten`,
       emoji: routineFormEmoji || '⭐',
       icon: routineFormEmoji || '⭐',
+      iconId: routineFormIconId || undefined,
+      iconImageDataUrl: routineFormImageDataUrl,
+      iconImageUrl: routineFormImageUrl,
       category: routineFormCategory as any,
       dagdeel: (['ochtend', 'middag', 'avond'].includes(routineFormCategory) ? routineFormCategory : 'ochtend') as TimeOfDay,
       suggestedDays: routineFormSuggestedDays.trim() || undefined,
@@ -787,9 +800,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2">
-                            <span className="text-2xl p-1 bg-white rounded-xl border border-slate-100 shrink-0 shadow-2xs">
-                              {template.emoji || template.icon || '⭐'}
-                            </span>
+                            <IconVisual
+                              emoji={template.emoji || template.icon}
+                              imageDataUrl={template.iconImageDataUrl}
+                              imageUrl={template.iconImageUrl}
+                              className="text-2xl p-1 bg-white rounded-xl border border-slate-100 shrink-0 shadow-2xs w-10 h-10 inline-flex items-center justify-center"
+                              imageClassName="w-full h-full object-contain"
+                            />
                             <div className="flex items-center gap-1">
                               {template.isCustom && (
                                 <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[9px] font-black">
@@ -865,7 +882,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                      <span>{selectedTemplate.emoji || selectedTemplate.icon || '⭐'}</span>
+                      <IconVisual
+                        emoji={selectedTemplate.emoji || selectedTemplate.icon}
+                        imageDataUrl={selectedTemplate.iconImageDataUrl}
+                        imageUrl={selectedTemplate.iconImageUrl}
+                        className="inline-flex items-center justify-center"
+                        imageClassName="w-5 h-5 object-contain"
+                      />
                       <span>Activiteiten in dit pakket ({activeActivityIds.length} geselecteerd):</span>
                     </span>
                     <div className="flex items-center gap-2">
@@ -1159,9 +1182,13 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                       Routine Icoon:
                     </label>
                     <div className="flex items-center gap-2">
-                      <span className="text-3xl p-1 bg-white rounded-xl border border-slate-200 shrink-0">
-                        {routineFormEmoji}
-                      </span>
+                      <IconVisual
+                        emoji={routineFormEmoji}
+                        imageDataUrl={routineFormImageDataUrl}
+                        imageUrl={routineFormImageUrl}
+                        className="text-3xl p-1 bg-white rounded-xl border border-slate-200 shrink-0 w-12 h-12 inline-flex items-center justify-center"
+                        imageClassName="w-full h-full object-contain"
+                      />
                       <button
                         type="button"
                         onClick={() => {
@@ -1188,7 +1215,12 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                       <button
                         key={`quick-${emoji}-${idx}`}
                         type="button"
-                        onClick={() => setRoutineFormEmoji(emoji)}
+                        onClick={() => {
+                          setRoutineFormEmoji(emoji);
+                          setRoutineFormIconId('');
+                          setRoutineFormImageDataUrl(undefined);
+                          setRoutineFormImageUrl(undefined);
+                        }}
                         className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-transform hover:scale-110 cursor-pointer ${
                           routineFormEmoji === emoji
                             ? 'bg-indigo-600 text-white shadow-xs'
@@ -1555,7 +1587,7 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={handleInsert}
+                    onClick={() => handleInsert()}
                     disabled={activeActivityIds.length === 0}
                     className="px-6 py-2.5 rounded-2xl text-xs font-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 cursor-pointer"
                   >

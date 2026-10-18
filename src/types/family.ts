@@ -90,6 +90,9 @@ export interface RoutineTemplate {
   title?: string;
   name?: string;
   icon?: string;
+  iconId?: string;
+  iconImageDataUrl?: string;
+  iconImageUrl?: string;
   emoji?: string;
   category?: string;
   description?: string;

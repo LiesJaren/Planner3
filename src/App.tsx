@@ -79,6 +79,20 @@ function loadStoredArray<T>(key: string, legacyKey?: string): T[] | null {
   return null;
 }
 
+function loadStoredCustomIcons(): ActivityIcon[] {
+  const currentIcons = loadStoredArray<ActivityIcon>('fp_custom_icons') ?? [];
+  const legacyIcons = loadStoredArray<ActivityIcon>('familieplanner_custom_icons_v2') ?? [];
+  const iconsById = new Map<string, ActivityIcon>();
+
+  [...legacyIcons, ...currentIcons].forEach((icon) => {
+    if (icon && typeof icon.id === 'string') {
+      iconsById.set(icon.id, icon);
+    }
+  });
+
+  return Array.from(iconsById.values());
+}
+
 export default function App() {
   const today = getTodayDateStr();
   const monday = getWeekMonday(today);
@@ -173,7 +187,7 @@ export default function App() {
   });
 
   const [customIcons, setCustomIcons] = useState<ActivityIcon[]>(() => {
-    return loadStoredArray<ActivityIcon>('fp_custom_icons', 'familieplanner_custom_icons_v2') ?? [];
+    return loadStoredCustomIcons();
   });
 
   const [customCategories, setCustomCategories] = useState<IconCategoryMeta[]>(() => {
