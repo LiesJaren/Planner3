@@ -143,3 +143,10 @@ export interface ActivityIcon {
   imageUrl?: string;
   isCustom?: boolean;
 }
+
+export interface PlannerPreferences {
+  iconRows: 2 | 3;
+  defaultIconOnlyView: boolean;
+  showKidsTab: boolean;
+  showGroceriesTab: boolean;
+}

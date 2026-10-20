@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   ShieldCheck,
   Star,
@@ -16,6 +16,7 @@ import {
   Filter,
   Trophy,
   Award,
+  Download,
   ArrowRight,
   Clock,
   MapPin,
@@ -28,8 +29,11 @@ import {
   Loader2,
   ChevronRight,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
 import {
   FamilyMember,
   AgendaEvent,
@@ -38,6 +42,7 @@ import {
   ActivityIcon,
   IconCategoryMeta,
   TimeOfDay,
+  PlannerPreferences,
 } from '../types/family';
 import { soundEffects, spreekBericht } from '../utils/audio';
 import { IconVisual } from './IconVisual';
@@ -69,6 +74,9 @@ interface ParentPortalViewProps {
   onOpenInsertRoutineModal?: (dateStr?: string) => void;
   onOpenCopyModal?: (sourceDateStr?: string, eventId?: string) => void;
   onOpenFamilySettings: () => void;
+  onDownloadBackup: () => void;
+  preferences: PlannerPreferences;
+  onUpdatePreferences: (preferences: PlannerPreferences) => void;
   onOpenCreateIconModal: () => void;
   onEditMember: (member: FamilyMember) => void;
 }
@@ -97,11 +105,14 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   onOpenInsertRoutineModal,
   onOpenCopyModal,
   onOpenFamilySettings,
+  onDownloadBackup,
+  preferences,
+  onUpdatePreferences,
   onOpenCreateIconModal,
   onEditMember,
 }) => {
   // Navigation within the parent portal
-  const [activeTab, setActiveTab] = useState<'beloningen' | 'activiteiten' | 'iconen' | 'afdrukken' | 'gezin'>('beloningen');
+  const [activeTab, setActiveTab] = useState<'beloningen' | 'activiteiten' | 'iconen' | 'afdrukken' | 'gezin' | 'instellingen'>('beloningen');
 
   // Active parent acting in the portal: default to Birger or Lieselot
   const parents = useMemo(() => members.filter((m) => m.role === 'ouder'), [members]);
@@ -170,6 +181,55 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
 
   const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories]);
   const allIcons = useMemo(() => [...customIcons, ...ACTIVITY_ICONS], [customIcons]);
+  const iconPdfContentRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingIconPdf, setIsGeneratingIconPdf] = useState(false);
+
+  const handleDownloadIconPdf = async () => {
+    const content = iconPdfContentRef.current;
+    if (!content || isGeneratingIconPdf) return;
+
+    setIsGeneratingIconPdf(true);
+    try {
+      const imageData = await toPng(content, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+      });
+      const image = new Image();
+      image.src = imageData;
+      await image.decode();
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const margin = 10;
+      const contentWidth = 210 - margin * 2;
+      const contentHeight = 297 - margin * 2;
+      const scale = contentWidth / image.naturalWidth;
+      const pagePixelHeight = contentHeight / scale;
+      const pageCount = Math.ceil(image.naturalHeight / pagePixelHeight);
+
+      for (let page = 0; page < pageCount; page += 1) {
+        if (page > 0) pdf.addPage();
+        const sourceY = page * pagePixelHeight;
+        const sliceHeight = Math.min(pagePixelHeight, image.naturalHeight - sourceY);
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = Math.ceil(sliceHeight);
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Kon de PDF-pagina niet voorbereiden');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, sourceY, image.naturalWidth, sliceHeight, 0, 0, image.naturalWidth, sliceHeight);
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, contentWidth, sliceHeight * scale);
+      }
+
+      pdf.save('familieplanner-iconenbibliotheek.pdf');
+    } catch (error) {
+      console.error('PDF met plannericonen kon niet worden gemaakt:', error);
+      window.alert('De iconen-PDF kon niet worden gemaakt. Probeer het opnieuw.');
+    } finally {
+      setIsGeneratingIconPdf(false);
+    }
+  };
 
   const filteredIcons = useMemo(() => {
     return allIcons.filter((ic) => {
@@ -370,40 +430,54 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
             </p>
           </div>
 
-          {/* Active Parent Selector */}
-          <div className="bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/20 flex flex-col gap-1 shrink-0">
-            <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
-              <UserCheck className="w-3.5 h-3.5" /> Ingelogde Ouder:
-            </span>
-            <div className="flex items-center gap-1.5">
-              {parents.map((p) => {
-                const isActive = activeParent.toLowerCase().includes(p.name.toLowerCase());
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      soundEffects.playTap();
-                      setActiveParent(p.name);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
-                      isActive
-                        ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
-                        : 'bg-white/10 text-white hover:bg-white/20'
-                    }`}
-                  >
-                    <span>{p.avatar}</span>
-                    <span>{p.name.split(' ')[0]}</span>
-                    {isActive && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </button>
-                );
-              })}
+          <div className="flex flex-col gap-2 shrink-0">
+            {/* Active Parent Selector */}
+            <div className="bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/20 flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                <UserCheck className="w-3.5 h-3.5" /> Ingelogde Ouder:
+              </span>
+              <div className="flex items-center gap-1.5">
+                {parents.map((p) => {
+                  const isActive = activeParent.toLowerCase().includes(p.name.toLowerCase());
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playTap();
+                        setActiveParent(p.name);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+                        isActive
+                          ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      <span>{p.avatar}</span>
+                      <span>{p.name.split(' ')[0]}</span>
+                      {isActive && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playTap();
+                onDownloadBackup();
+              }}
+              className="px-4 py-2 rounded-xl bg-white text-slate-900 hover:bg-amber-50 text-xs font-black flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Back-up downloaden (incl. iconen)
+            </button>
           </div>
         </div>
 
         {/* Quick Tabs within Parent Portal */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-5 pt-4 border-t border-white/10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-5 pt-4 border-t border-white/10">
           <button
             type="button"
             onClick={() => {
@@ -487,6 +561,22 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
           >
             <Users className="w-4 h-4" />
             <span>👨‍👩‍👦 Gezinsleden ({members.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playTap();
+              setActiveTab('instellingen');
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'instellingen'
+                ? 'bg-amber-400 text-slate-950 shadow-md'
+                : 'bg-white/5 text-slate-200 hover:bg-white/15'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Zelf aanpassen</span>
           </button>
         </div>
       </div>
@@ -1295,12 +1385,74 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => void handleDownloadIconPdf()}
+                  disabled={isGeneratingIconPdf}
+                  className="bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-800 border border-slate-300 font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isGeneratingIconPdf ? 'PDF maken...' : 'Iconen als PDF'}</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => onOpenCreateIconModal()}
                   className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Zelf Icoon Ontwerpen</span>
                 </button>
+              </div>
+            </div>
+
+            <div
+              ref={iconPdfContentRef}
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                left: '-12000px',
+                top: 0,
+                width: '1100px',
+                padding: '32px',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontFamily: 'Arial, sans-serif',
+              }}
+            >
+              <h1 style={{ margin: '0 0 8px', fontSize: '28px', fontWeight: 700 }}>
+                FamiliePlanner — Iconenbibliotheek
+              </h1>
+              <p style={{ margin: '0 0 24px', color: '#475569', fontSize: '14px' }}>
+                {allIcons.length} pictogrammen - standaardiconen en eigen iconen
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '12px' }}>
+                {allIcons.map((icon) => (
+                  <div
+                    key={icon.id}
+                    style={{
+                      minHeight: '112px',
+                      padding: '12px 8px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <IconVisual
+                      emoji={icon.emoji}
+                      imageDataUrl={icon.imageDataUrl}
+                      imageUrl={icon.imageUrl}
+                      className="text-4xl"
+                      imageClassName="h-12 w-12 object-contain"
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: 700 }}>{icon.label}</span>
+                    <span style={{ fontSize: '10px', color: '#64748b' }}>
+                      {icon.categoryLabel || icon.category}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1480,6 +1632,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                           {m.stars ?? 0} Sterren
                         </span>
                       )}
+
                     </div>
                   </div>
 
@@ -1494,6 +1647,111 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'instellingen' && (
+        <div className="space-y-6">
+          <section className="rounded-3xl border-2 border-amber-200 bg-white p-6 shadow-sm space-y-5">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Planner zelf aanpassen</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Deze instellingen worden met de planner opgeslagen en gelden voor iedereen met dezelfde deellink.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <h3 className="font-black text-slate-900">Iconenweergave</h3>
+                <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={preferences.defaultIconOnlyView}
+                    onChange={(event) => onUpdatePreferences({
+                      ...preferences,
+                      defaultIconOnlyView: event.target.checked,
+                    })}
+                    className="h-4 w-4 accent-amber-500"
+                  />
+                  Open de dag standaard met alleen iconen
+                </label>
+                <div className="mt-4">
+                  <span className="text-sm font-semibold text-slate-700">Aantal iconenrijen</span>
+                  <div className="mt-2 flex gap-2">
+                    {([2, 3] as const).map((rows) => (
+                      <button
+                        key={rows}
+                        type="button"
+                        onClick={() => onUpdatePreferences({ ...preferences, iconRows: rows })}
+                        aria-pressed={preferences.iconRows === rows}
+                        className={`rounded-xl border px-4 py-2 text-sm font-bold ${
+                          preferences.iconRows === rows
+                            ? 'border-amber-500 bg-amber-100 text-amber-950'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        {rows} rijen
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <h3 className="font-black text-slate-900">Zichtbare onderdelen</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Verberg onderdelen die jullie niet gebruiken. Je kunt ze hier altijd weer aanzetten.
+                </p>
+                <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={preferences.showKidsTab}
+                    onChange={(event) => onUpdatePreferences({
+                      ...preferences,
+                      showKidsTab: event.target.checked,
+                    })}
+                    className="h-4 w-4 accent-amber-500"
+                  />
+                  Kindermodus tonen
+                </label>
+                <label className="mt-3 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={preferences.showGroceriesTab}
+                    onChange={(event) => onUpdatePreferences({
+                      ...preferences,
+                      showGroceriesTab: event.target.checked,
+                    })}
+                    className="h-4 w-4 accent-amber-500"
+                  />
+                  Boodschappen tonen
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border-2 border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">Meer zelf beheren</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Gebruik de bestaande onderdelen hieronder om activiteiten, routines, iconen en gezinskleuren te wijzigen.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                { label: 'Activiteiten en routines', tab: 'activiteiten' as const },
+                { label: 'Iconen en categorieën', tab: 'iconen' as const },
+                { label: 'Gezinsleden en kleuren', tab: 'gezin' as const },
+              ].map((item) => (
+                <button
+                  key={item.tab}
+                  type="button"
+                  onClick={() => setActiveTab(item.tab)}
+                  className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-800 hover:bg-amber-50"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
       )}
     </div>

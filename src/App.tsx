@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   Smile,
@@ -9,6 +9,7 @@ import {
   Star,
   Users,
   Sparkles,
+  Share2,
   Volume2,
   CheckCircle,
   Trash2,
@@ -24,6 +25,7 @@ import {
   IconCategoryMeta,
   TimeOfDay,
   RoutineTemplate,
+  PlannerPreferences,
 } from './types/family';
 
 import { AgendaView } from './components/AgendaView';
@@ -79,7 +81,80 @@ function loadStoredArray<T>(key: string, legacyKey?: string): T[] | null {
   return null;
 }
 
+interface PlannerData {
+  members: FamilyMember[];
+  events: AgendaEvent[];
+  groceries: GroceryItem[];
+  rewards: Reward[];
+  customIcons: ActivityIcon[];
+  customCategories: IconCategoryMeta[];
+  preferences: PlannerPreferences;
+}
+
+const DEFAULT_PREFERENCES: PlannerPreferences = {
+  iconRows: 3,
+  defaultIconOnlyView: false,
+  showKidsTab: true,
+  showGroceriesTab: true,
+};
+
+interface StoredPlannerData extends PlannerData {
+  revision: number;
+}
+
+function isPlannerData(value: unknown): value is StoredPlannerData {
+  if (typeof value !== 'object' || value === null) return false;
+  const data = value as Record<string, unknown>;
+  return ['members', 'events', 'groceries', 'rewards', 'customIcons', 'customCategories']
+    .every((key) => Array.isArray(data[key]))
+    && Number.isInteger(data.revision);
+}
+
+function normalizePlannerPreferences(value: unknown): PlannerPreferences {
+  if (typeof value !== 'object' || value === null) return DEFAULT_PREFERENCES;
+  const preferences = value as Partial<PlannerPreferences>;
+  return {
+    iconRows: preferences.iconRows === 2 ? 2 : 3,
+    defaultIconOnlyView: preferences.defaultIconOnlyView === true,
+    showKidsTab: preferences.showKidsTab !== false,
+    showGroceriesTab: preferences.showGroceriesTab !== false,
+  };
+}
+
+function serializePlannerData(data: PlannerData): string {
+  return JSON.stringify({
+    members: data.members,
+    events: data.events,
+    groceries: data.groceries,
+    rewards: data.rewards,
+    customIcons: data.customIcons,
+    customCategories: data.customCategories,
+    preferences: data.preferences,
+  });
+}
+
+function getPlannerId(): string {
+  const url = new URL(window.location.href);
+  let plannerId = url.searchParams.get('planner');
+  if (!plannerId || !/^[0-9a-f-]{36}$/i.test(plannerId)) {
+    plannerId = localStorage.getItem('fp_planner_id');
+    if (!plannerId || !/^[0-9a-f-]{36}$/i.test(plannerId)) {
+      plannerId = crypto.randomUUID();
+    }
+  }
+  if (localStorage.getItem('fp_planner_id') !== plannerId) {
+    localStorage.setItem('fp_planner_id', plannerId);
+  }
+  if (url.searchParams.get('planner') !== plannerId) {
+    url.searchParams.set('planner', plannerId);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+  return plannerId;
+}
+
 export default function App() {
+  const plannerId = getPlannerId();
+  const plannerApiUrl = `/api/planner?planner=${encodeURIComponent(plannerId)}`;
   const today = getTodayDateStr();
   const monday = getWeekMonday(today);
 
@@ -179,8 +254,90 @@ export default function App() {
   const [customCategories, setCustomCategories] = useState<IconCategoryMeta[]>(() => {
     return loadStoredArray<IconCategoryMeta>('fp_custom_categories', 'familieplanner_custom_cats_v2') ?? [];
   });
+  const [preferences, setPreferences] = useState<PlannerPreferences>(() => {
+    try {
+      const saved = localStorage.getItem('fp_preferences');
+      return saved ? normalizePlannerPreferences(JSON.parse(saved)) : DEFAULT_PREFERENCES;
+    } catch (error) {
+      console.warn('Could not load planner preferences:', error);
+      return DEFAULT_PREFERENCES;
+    }
+  });
 
-  // Local storage auto sync
+  const [syncStatus, setSyncStatus] = useState<'loading' | 'synced' | 'saving' | 'error' | 'conflict'>('loading');
+  const [isCloudReady, setIsCloudReady] = useState(false);
+  const syncStatusRef = useRef(syncStatus);
+  syncStatusRef.current = syncStatus;
+  const revisionRef = useRef(0);
+  const persistedSnapshotRef = useRef('');
+  const skipRemoteSaveRef = useRef(false);
+
+  const plannerData: PlannerData = { members, events, groceries, rewards, customIcons, customCategories, preferences };
+  const plannerDataRef = useRef(plannerData);
+  plannerDataRef.current = plannerData;
+
+  const applyPlannerData = (data: PlannerData) => {
+    setMembers(data.members);
+    setEvents(data.events);
+    setGroceries(data.groceries);
+    setRewards(data.rewards);
+    setCustomIcons(data.customIcons);
+    setCustomCategories(data.customCategories);
+    setPreferences(normalizePlannerPreferences(data.preferences));
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrate = async () => {
+      try {
+        const response = await fetch(plannerApiUrl);
+        if (!response.ok) throw new Error(`Planner ophalen mislukt (${response.status})`);
+        const result: unknown = await response.json();
+        if (typeof result !== 'object' || result === null || !('data' in result)) {
+          throw new Error('Ongeldig antwoord van de planneropslag');
+        }
+
+        let storedData: unknown = result.data;
+        if (storedData === null) {
+          const initialData = plannerData;
+          const saveResponse = await fetch(plannerApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: initialData, expectedRevision: 0 }),
+          });
+          const saveResult: unknown = await saveResponse.json();
+          if (saveResponse.status === 409 && typeof saveResult === 'object' && saveResult !== null && 'data' in saveResult) {
+            storedData = saveResult.data;
+          } else if (!saveResponse.ok) {
+            throw new Error(`Eerste plannergegevens opslaan mislukt (${saveResponse.status})`);
+          } else if (typeof saveResult === 'object' && saveResult !== null && 'data' in saveResult) {
+            storedData = saveResult.data;
+          }
+        }
+
+        if (!isPlannerData(storedData)) throw new Error('Ongeldige gegevens in de planneropslag');
+        storedData.preferences = normalizePlannerPreferences(storedData.preferences);
+        if (!active) return;
+        applyPlannerData(storedData);
+        revisionRef.current = storedData.revision;
+        persistedSnapshotRef.current = serializePlannerData(storedData);
+        skipRemoteSaveRef.current = true;
+        setIsCloudReady(true);
+        setSyncStatus('synced');
+      } catch (error) {
+        console.error('Gedeelde planner kon niet worden geladen:', error);
+        if (active) setSyncStatus('error');
+      }
+    };
+
+    void hydrate();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Keep the browser copy as a fallback and synchronize changes to shared storage.
   useEffect(() => {
     try {
       localStorage.setItem('fp_members', JSON.stringify(members));
@@ -189,10 +346,108 @@ export default function App() {
       localStorage.setItem('fp_rewards', JSON.stringify(rewards));
       localStorage.setItem('fp_custom_icons', JSON.stringify(customIcons));
       localStorage.setItem('fp_custom_categories', JSON.stringify(customCategories));
+      localStorage.setItem('fp_preferences', JSON.stringify(preferences));
     } catch (error) {
       console.warn('Could not save planner data to local storage:', error);
     }
-  }, [members, events, groceries, rewards, customIcons, customCategories]);
+
+    if (!isCloudReady) return;
+    const snapshot = serializePlannerData(plannerData);
+    if (skipRemoteSaveRef.current) {
+      skipRemoteSaveRef.current = false;
+      return;
+    }
+    if (snapshot === persistedSnapshotRef.current) return;
+
+    setSyncStatus('saving');
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch(plannerApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: plannerData, expectedRevision: revisionRef.current }),
+        });
+        const result: unknown = await response.json();
+        if (response.status === 409) {
+          setSyncStatus('conflict');
+          return;
+        }
+        if (!response.ok || typeof result !== 'object' || result === null || !('data' in result) || !isPlannerData(result.data)) {
+          throw new Error(`Planner opslaan mislukt (${response.status})`);
+        }
+        revisionRef.current = result.data.revision;
+        persistedSnapshotRef.current = snapshot;
+        setSyncStatus('synced');
+      } catch (error) {
+        console.error('Gedeelde planner kon niet worden opgeslagen:', error);
+        setSyncStatus('error');
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timeout);
+  }, [members, events, groceries, rewards, customIcons, customCategories, preferences, isCloudReady]);
+
+  useEffect(() => {
+    if (!isCloudReady) return;
+    const poll = window.setInterval(async () => {
+      try {
+        const response = await fetch(plannerApiUrl);
+        if (!response.ok) throw new Error(`Planner verversen mislukt (${response.status})`);
+        const result: unknown = await response.json();
+        if (typeof result !== 'object' || result === null || !('data' in result) || !isPlannerData(result.data)) {
+          throw new Error('Ongeldig antwoord van de planneropslag');
+        }
+
+        const latest: StoredPlannerData = {
+          ...result.data,
+          preferences: normalizePlannerPreferences(result.data.preferences),
+        };
+        const localSnapshot = serializePlannerData(plannerDataRef.current);
+        const hasLocalChanges = localSnapshot !== persistedSnapshotRef.current;
+        if (latest.revision > revisionRef.current) {
+          if (hasLocalChanges) {
+            if (serializePlannerData(latest) === localSnapshot) {
+              revisionRef.current = latest.revision;
+              persistedSnapshotRef.current = localSnapshot;
+              setSyncStatus('synced');
+              return;
+            }
+            setSyncStatus('conflict');
+            return;
+          }
+          applyPlannerData(latest);
+          revisionRef.current = latest.revision;
+          persistedSnapshotRef.current = serializePlannerData(latest);
+          skipRemoteSaveRef.current = true;
+        }
+        if (hasLocalChanges && syncStatusRef.current === 'error') {
+          const retryResponse = await fetch(plannerApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: plannerDataRef.current, expectedRevision: latest.revision }),
+          });
+          const retryResult: unknown = await retryResponse.json();
+          if (retryResponse.status === 409) {
+            setSyncStatus('conflict');
+            return;
+          }
+          if (!retryResponse.ok || typeof retryResult !== 'object' || retryResult === null || !('data' in retryResult) || !isPlannerData(retryResult.data)) {
+            throw new Error(`Planner opnieuw opslaan mislukt (${retryResponse.status})`);
+          }
+          revisionRef.current = retryResult.data.revision;
+          persistedSnapshotRef.current = serializePlannerData(retryResult.data);
+          setSyncStatus('synced');
+        } else if (!hasLocalChanges) {
+          setSyncStatus((current) => current === 'saving' ? current : 'synced');
+        }
+      } catch (error) {
+        console.error('Gedeelde planner kon niet worden ververst:', error);
+        setSyncStatus('error');
+      }
+    }, 5000);
+
+    return () => window.clearInterval(poll);
+  }, [isCloudReady]);
 
   // Modal Control States
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -389,11 +644,42 @@ export default function App() {
     setGroceries((prev) => prev.filter((g) => g.id !== id));
   };
 
+  const handleDownloadBackup = () => {
+    try {
+      const backup = {
+        format: 'familieplanner-backup',
+        version: 1,
+        createdAt: new Date().toISOString(),
+        data: plannerData,
+      };
+      const file = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `familieplanner-backup-${getTodayDateStr()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Plannerback-up kon niet worden gedownload:', error);
+      window.alert('De back-up kon niet worden gedownload. Probeer het opnieuw.');
+    }
+  };
+
+  if (syncStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50 p-6 text-center text-lg font-bold text-slate-800" role="status">
+        Gedeelde planner wordt geladen...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-amber-50/30 text-slate-800">
       {/* Top Application Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-2 border-amber-200 shadow-xs no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-4">
           {/* Logo & Family identity */}
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white flex items-center justify-center text-2xl shadow-sm border-2 border-white">
@@ -413,14 +699,14 @@ export default function App() {
           </div>
 
           {/* Center Navigation Tabs */}
-          <nav className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-2xs">
+          <nav aria-label="Hoofdnavigatie" className="order-3 lg:order-none w-full lg:w-auto flex items-center justify-start sm:justify-center overflow-x-auto bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-2xs">
             <button
               type="button"
               onClick={() => {
                 soundEffects.playTap();
                 setActiveTab('agenda');
               }}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'agenda'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
@@ -430,21 +716,23 @@ export default function App() {
               <span>Agenda</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                soundEffects.playTap();
-                setActiveTab('kids');
-              }}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'kids'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <Smile className="w-4 h-4" />
-              <span>Kindermodus</span>
-            </button>
+            {preferences.showKidsTab && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playTap();
+                  setActiveTab('kids');
+                }}
+                className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'kids'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <Smile className="w-4 h-4" />
+                <span>Kindermodus</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -452,7 +740,7 @@ export default function App() {
                 soundEffects.playTap();
                 setActiveTab('ouders');
               }}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'ouders'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
@@ -462,39 +750,79 @@ export default function App() {
               <span>Ouderportaal</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                soundEffects.playTap();
-                setActiveTab('boodschappen');
-              }}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'boodschappen'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Boodschappen</span>
-            </button>
+            {preferences.showGroceriesTab && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playTap();
+                  setActiveTab('boodschappen');
+                }}
+                className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'boodschappen'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>Boodschappen</span>
+              </button>
+            )}
           </nav>
 
-          {/* Right quick tools: Stars meter + Print shortcut */}
-          <div className="flex items-center gap-2">
+          {/* Right quick tools: stars, sharing and printing */}
+          <div className="ml-auto flex items-center gap-2">
             {/* Quick Star Counter for Jaren */}
-            <div
-              onClick={() => {
-                soundEffects.playStarChime();
-                setActiveTab('kids');
+            {preferences.showKidsTab && (
+              <div
+                onClick={() => {
+                  soundEffects.playStarChime();
+                  setActiveTab('kids');
+                }}
+                className="shrink-0 px-3 py-1.5 rounded-2xl bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 flex items-center gap-1.5 cursor-pointer transition-transform active:scale-95 shadow-2xs"
+                title="Sterren van Jaren - Klik om naar Kindermodus te gaan"
+              >
+                <Star className="w-4 h-4 fill-amber-500 text-amber-500 animate-bounce" />
+                <span className="text-xs font-black text-amber-950">
+                  ⭐ {childStars}
+                </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                const shareUrl = window.location.href;
+                if (navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: 'FamiliePlanner',
+                      text: 'Bekijk onze gedeelde FamiliePlanner.',
+                      url: shareUrl,
+                    });
+                    return;
+                  } catch (error) {
+                    if (error instanceof Error && error.name === 'AbortError') return;
+                    console.error('De plannerlink kon niet worden gedeeld:', error);
+                  }
+                }
+                if (navigator.clipboard?.writeText) {
+                  void navigator.clipboard.writeText(shareUrl)
+                    .then(() => window.alert('Deellink gekopieerd. Stuur deze link naar je vriend.'))
+                    .catch((error: unknown) => {
+                      console.error('De plannerlink kon niet naar het klembord worden gekopieerd:', error);
+                      window.prompt('Kopieer deze deellink:', shareUrl);
+                    });
+                } else {
+                  window.prompt('Kopieer deze deellink:', shareUrl);
+                }
               }}
-              className="px-3 py-1.5 rounded-2xl bg-amber-100 hover:bg-amber-200 border-2 border-amber-300 flex items-center gap-1.5 cursor-pointer transition-transform active:scale-95 shadow-2xs"
-              title="Sterren van Jaren - Klik om naar Kindermodus te gaan"
+              className="shrink-0 px-3.5 py-2 rounded-2xl text-xs font-black bg-white hover:bg-amber-50 text-slate-800 border border-amber-300 shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Kopieer een link naar deze gedeelde planner"
+              aria-label="Deel plannerlink"
             >
-              <Star className="w-4 h-4 fill-amber-500 text-amber-500 animate-bounce" />
-              <span className="text-xs font-black text-amber-950">
-                ⭐ {childStars}
-              </span>
-            </div>
+              <Share2 className="w-4 h-4" />
+              <span className="hidden md:inline">Deellink</span>
+            </button>
 
             {/* Print 1 A4 Quick Action */}
             <button
@@ -505,8 +833,9 @@ export default function App() {
                 setPrintScope('week');
                 setIsPrintModalOpen(true);
               }}
-              className="px-3.5 py-2 rounded-2xl text-xs font-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-sm flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
+              className="shrink-0 px-3.5 py-2 rounded-2xl text-xs font-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-sm flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
               title="Druk de weekplanning af op 1 vel A4 voor op de koelkast"
+              aria-label="Print weekplanning op 1 A4"
             >
               <Printer className="w-4 h-4" />
               <span className="hidden md:inline">Print 1 A4</span>
@@ -517,6 +846,20 @@ export default function App() {
 
       {/* Main App Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+        {syncStatus !== 'synced' && (
+          <div
+            role="status"
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
+              syncStatus === 'error' || syncStatus === 'conflict'
+                ? 'border-rose-300 bg-rose-50 text-rose-800'
+                : 'border-amber-300 bg-amber-50 text-amber-900'
+            }`}
+          >
+            {syncStatus === 'saving' && 'Wijzigingen worden gedeeld opgeslagen...'}
+            {syncStatus === 'error' && 'Gedeelde opslag niet bereikbaar. Wijzigingen blijven voorlopig alleen op dit apparaat; de app probeert opnieuw te synchroniseren. Controleer de Vercel-opslaginstellingen.'}
+            {syncStatus === 'conflict' && 'De planner is op een ander apparaat gewijzigd. Deze wijzigingen zijn nog niet gedeeld. Maak zo nodig eerst een JSON-back-up via het Ouderportaal voordat je vernieuwt.'}
+          </div>
+        )}
         <section className="relative mb-6 overflow-hidden rounded-3xl border-2 border-amber-300 bg-slate-900 shadow-lg">
           <div className="relative h-48 w-full overflow-hidden sm:h-60 md:h-72">
             <img
@@ -542,6 +885,8 @@ export default function App() {
           <AgendaView
             events={events}
             members={members}
+            iconRows={preferences.iconRows}
+            defaultIconOnlyView={preferences.defaultIconOnlyView}
             initialDate={today}
             onAddEvent={handleOpenAddEvent}
             onEditEvent={handleOpenEditEvent}
@@ -590,6 +935,8 @@ export default function App() {
             groceries={groceries}
             customIcons={customIcons}
             customCategories={customCategories}
+            preferences={preferences}
+            onUpdatePreferences={setPreferences}
             onAddEvent={handleOpenAddEvent}
             onEditEvent={handleOpenEditEvent}
             onDeleteEvent={handleDeleteEvent}
@@ -624,8 +971,9 @@ export default function App() {
             }}
             onOpenFamilySettings={() => {
               soundEffects.playTap();
-              alert('Gezinsbeheer: Namen en voorkeuren worden direct opgeslagen in LocalStorage.');
+              alert('Gezinsbeheer: Namen en voorkeuren worden gedeeld opgeslagen.');
             }}
+            onDownloadBackup={handleDownloadBackup}
             onOpenCreateIconModal={() => setIsCreateIconModalOpen(true)}
             onEditMember={(m) => {
               setMembers((prev) => prev.map((item) => (item.id === m.id ? m : item)));

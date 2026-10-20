@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
+import { plannerHandler } from './src/server/plannerHandler';
 
 dotenv.config();
 
@@ -13,6 +14,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.all('/api/planner', (req, res) => {
+  void plannerHandler(req, res);
+});
 
 // Initialize Google Gemini API server-side client
 const apiKey = process.env.GEMINI_API_KEY;

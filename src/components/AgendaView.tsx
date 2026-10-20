@@ -61,6 +61,8 @@ interface AgendaViewProps {
   onOpenInsertRoutineModal?: (dateStr?: string) => void;
   onOpenCopyModal?: (sourceDateStr?: string, eventId?: string) => void;
   onBatchInsertEvents?: (newEvents: AgendaEvent[]) => void;
+  iconRows?: 2 | 3;
+  defaultIconOnlyView?: boolean;
 }
 
 export const AgendaView: React.FC<AgendaViewProps> = ({
@@ -78,10 +80,13 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onOpenInsertRoutineModal,
   onOpenCopyModal,
   onBatchInsertEvents,
+  iconRows = 3,
+  defaultIconOnlyView = false,
 }) => {
   const [currentDateStr, setCurrentDateStr] = useState<string>(() => initialDate || getTodayDateStr());
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all');
   const [viewType, setViewType] = useState<'dag' | 'week'>(() => initialViewType || 'week');
+  const [iconOnlyView, setIconOnlyView] = useState(defaultIconOnlyView);
   const [speakingEventId, setSpeakingEventId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1202,6 +1207,24 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 
             {/* Day Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setIconOnlyView(false)}
+                  aria-pressed={!iconOnlyView}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${!iconOnlyView ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                >
+                  Kaarten
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIconOnlyView(true)}
+                  aria-pressed={iconOnlyView}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${iconOnlyView ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                >
+                  Alleen iconen
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => onAddEvent(currentDateStr)}
@@ -1350,23 +1373,27 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   </span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {groupedDayEvents.ochtend.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      members={members}
-                      isSpeaking={speakingEventId === event.id}
-                      onSpeak={handleSpeak}
-                      onCheck={handleCheckRoutine}
-                      onEdit={onEditEvent}
-                      onDeleteSingle={onDeleteEvent}
-                      onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
-                      onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
-                      getNightsSleep={getNightsSleep}
-                    />
-                  ))}
-                </div>
+                iconOnlyView ? (
+                  <IconOnlyEventGrid events={groupedDayEvents.ochtend} onEdit={onEditEvent} rows={iconRows} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {groupedDayEvents.ochtend.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        members={members}
+                        isSpeaking={speakingEventId === event.id}
+                        onSpeak={handleSpeak}
+                        onCheck={handleCheckRoutine}
+                        onEdit={onEditEvent}
+                        onDeleteSingle={onDeleteEvent}
+                        onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
+                        onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
+                        getNightsSleep={getNightsSleep}
+                      />
+                    ))}
+                  </div>
+                )
               )}
             </div>
 
@@ -1430,23 +1457,27 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   </span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {groupedDayEvents.middag.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      members={members}
-                      isSpeaking={speakingEventId === event.id}
-                      onSpeak={handleSpeak}
-                      onCheck={handleCheckRoutine}
-                      onEdit={onEditEvent}
-                      onDeleteSingle={onDeleteEvent}
-                      onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
-                      onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
-                      getNightsSleep={getNightsSleep}
-                    />
-                  ))}
-                </div>
+                iconOnlyView ? (
+                  <IconOnlyEventGrid events={groupedDayEvents.middag} onEdit={onEditEvent} rows={iconRows} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {groupedDayEvents.middag.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        members={members}
+                        isSpeaking={speakingEventId === event.id}
+                        onSpeak={handleSpeak}
+                        onCheck={handleCheckRoutine}
+                        onEdit={onEditEvent}
+                        onDeleteSingle={onDeleteEvent}
+                        onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
+                        onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
+                        getNightsSleep={getNightsSleep}
+                      />
+                    ))}
+                  </div>
+                )
               )}
             </div>
 
@@ -1510,23 +1541,27 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   </span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {groupedDayEvents.avond.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      members={members}
-                      isSpeaking={speakingEventId === event.id}
-                      onSpeak={handleSpeak}
-                      onCheck={handleCheckRoutine}
-                      onEdit={onEditEvent}
-                      onDeleteSingle={onDeleteEvent}
-                      onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
-                      onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
-                      getNightsSleep={getNightsSleep}
-                    />
-                  ))}
-                </div>
+                iconOnlyView ? (
+                  <IconOnlyEventGrid events={groupedDayEvents.avond} onEdit={onEditEvent} rows={iconRows} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {groupedDayEvents.avond.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        members={members}
+                        isSpeaking={speakingEventId === event.id}
+                        onSpeak={handleSpeak}
+                        onCheck={handleCheckRoutine}
+                        onEdit={onEditEvent}
+                        onDeleteSingle={onDeleteEvent}
+                        onDuplicateSingle={onDuplicateEvent ? () => onDuplicateEvent(event) : undefined}
+                        onCopySingle={onOpenCopyModal ? () => onOpenCopyModal(event.date, event.id) : undefined}
+                        getNightsSleep={getNightsSleep}
+                      />
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -1535,6 +1570,42 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
     </div>
   );
 };
+
+const IconOnlyEventGrid: React.FC<{
+  events: AgendaEvent[];
+  onEdit: (event: AgendaEvent) => void;
+  rows: 2 | 3;
+}> = ({ events, onEdit, rows }) => (
+  <div
+    className="grid grid-flow-col auto-cols-[4.5rem] gap-2 overflow-x-auto pb-1"
+    style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}
+  >
+    {events.map((event) => (
+      <button
+        key={event.id}
+        type="button"
+        onClick={() => onEdit(event)}
+        aria-label={`Bewerk ${event.title}`}
+        title={`${event.title} • ${event.startTime}`}
+        className={`relative flex h-16 w-16 items-center justify-center rounded-2xl border-2 text-3xl transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+          event.completed
+            ? 'border-emerald-300 bg-emerald-50 opacity-70'
+            : 'border-slate-200 bg-white hover:border-amber-300'
+        }`}
+      >
+        <IconVisual
+          emoji={event.iconEmoji || event.icon}
+          imageDataUrl={event.iconImageDataUrl}
+          imageUrl={event.iconImageUrl}
+          imageClassName="h-11 w-11 object-contain"
+        />
+        {event.completed && (
+          <CheckCircle2 className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-white text-emerald-600" />
+        )}
+      </button>
+    ))}
+  </div>
+);
 
 // Child-friendly event card component
 interface EventCardProps {
