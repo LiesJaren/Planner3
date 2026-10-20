@@ -79,7 +79,10 @@ Een afgeschermd controlepaneel waarin ouders het gezinsleven centraal beheren:
   * Web Speech API (`SpeechSynthesis`) met Nederlandse stemaccenten
 * **Backend**: Express met Vite Middleware in development (`server.ts`)
 * **AI Integratie**: `@google/genai` (Google Gemini API via `/api/generate-icon`) met robuuste offline patroonherkenning als fallback
-* **Data Opslag**: Lokale browserpersistentie (`LocalStorage`) met volledige JSON import- en exportfunctie
+* **Data Opslag**: Gedeelde plannergegevens via Vercel KV (Upstash Redis), met browseropslag als lokale kopie en JSON-import- en exportfunctie
+* **Iconenweergave**: Bekijk de dagplanning desgewenst als compacte rasterweergave met drie rijen iconen per dagdeel; de bestaande kaartenweergave blijft beschikbaar
+* **Iconen exporteren**: Download de volledige iconenbibliotheek als PDF en bewaar eigen iconen ook in de JSON-back-up
+* **Zelf aanpassen**: In het Ouderportaal kun je de standaardweergave, twee of drie iconenrijen en de zichtbaarheid van Kindermodus en Boodschappen instellen. Activiteiten, eigen iconen, categorieën en gezinskleuren beheer je via de bestaande beheeronderdelen.
 
 ---
 
@@ -92,18 +95,21 @@ Een afgeschermd controlepaneel waarin ouders het gezinsleven centraal beheren:
 ### Stappen
 1. Clone of open het project in je terminal:
    ```bash
-   cd familieplanner
+   git clone https://github.com/LiesJaren/Planner3.git
+   cd Planner3
    ```
 
 2. Installeer de afhankelijkheden:
    ```bash
    npm install
    ```
+   De repository bevat een `package-lock.json`. Gebruik `npm ci` voor een reproduceerbare installatie met exact vastgelegde versies; de Docker- en Render-build doen dat automatisch.
 
 3. Configureer optioneel je Gemini API sleutel in `.env`:
    ```env
    GEMINI_API_KEY="jouw_gemini_api_sleutel"
    ```
+   Voor gedeelde plannergegevens koppel je in Vercel via **Storage → Create Database → Marketplace → Upstash Redis** een Redis-database. Zorg dat `KV_REST_API_URL` en `KV_REST_API_TOKEN` (of `UPSTASH_REDIS_REST_URL` en `UPSTASH_REDIS_REST_TOKEN`) voor de deployment zijn ingesteld. Zonder deze variabelen blijft de planner alleen lokaal beschikbaar.
 
 4. Start de ontwikkelserver:
    ```bash
@@ -116,6 +122,20 @@ Een afgeschermd controlepaneel waarin ouders het gezinsleven centraal beheren:
    npm run build
    ```
 
+### 🚀 Deployment: Vercel (primair) of Render/Docker (backup)
+
+**Vercel (primair pad)** — koppel de repository aan Vercel. `vercel.json` bouwt de client naar `dist/`, zet `api/` in als serverless functions en rewritet alle overige routes naar `index.html` zodat diepe links binnen de SPA werken. Stel in **Project Settings → Environment Variables** minstens in:
+* `GEMINI_API_KEY` — optioneel; zonder sleutel valt de icoongenerator terug op lokale patroonherkenning.
+* `KV_REST_API_URL` en `KV_REST_API_TOKEN` (of `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`) — nodig voor gedeelde plannergegevens; zonder deze variabelen blijft de planner alleen lokaal beschikbaar.
+
+**Render of Docker (backuppad)** — `render.yaml` en `Dockerfile` draaien dezelfde Express-server als de ontwikkelmodus. De build gebruikt `npm ci` (gebaseerd op de `package-lock.json`) en start met `npm start`. Stel in hetzelfde Render-dashboard dezelfde variabelen in: `GEMINI_API_KEY`, `KV_REST_API_URL` en `KV_REST_API_TOKEN`, eventueel aangevuld met `PORT`.
+
+**Noch de sleutels, noch de lockfile mogen ontbreken op een van beide platforms — leg per platform expliciet vast welke variabelen ingesteld zijn.**
+
+### Dezelfde planner op meerdere apparaten gebruiken
+
+Deel de planner via de knop **Deellink** en open precies die link op elk apparaat. De plannerlink bevat een unieke sleutel; wie de link heeft, kan de gezinsplanner bekijken en wijzigen. Deel de link daarom alleen met mensen die toegang mogen hebben. Voor synchronisatie tussen browsers en apparaten moet de app online staan met de Vercel/Upstash-opslagvariabelen hierboven ingesteld. Zonder die gedeelde opslag blijven wijzigingen lokaal in de gebruikte browser.
+
 ---
 
 ## 👨‍👩‍👦 Gebruikstips voor het Gezin
@@ -123,3 +143,9 @@ Een afgeschermd controlepaneel waarin ouders het gezinsleven centraal beheren:
 1. **Dagelijkse Routine**: Open 's ochtends de **Kindermodus** op een tablet in de keuken zodat Jaren zelf kan zien wat er die dag gebeurt.
 2. **Koelkastversie**: Druk elke zondagavond met de knop **"Print 1 A4"** de weekplanning af en hang deze met magneten op de koelkast.
 3. **Sterren Sparen**: Geef Jaren na het tandenpoetsen of opruimen een ster via het Ouderportaal. Bij 5 sterren kiezen Birger en Lieselot samen de beloning uit!
+
+De eerste browser die een planner opent, zet bestaande gegevens uit diens LocalStorage over naar de gedeelde opslag. Gebruik **Deellink** om dezelfde planner op een ander apparaat of met een vriend te openen. De link bevat een geheime planner-ID: iedereen met die link kan de gegevens bekijken en wijzigen, dus deel hem alleen met mensen die toegang mogen hebben. Maak vóór de eerste migratie bij voorkeur een JSON-back-up via het Ouderportaal.
+
+In de dagweergave kun je schakelen tussen **Kaarten** en **Alleen iconen**. De iconenweergave toont de geplande activiteiten in drie rijen per dagdeel; klik op een icoon om de activiteit te bewerken. In het Ouderportaal kun je via **Iconen als PDF** de standaardiconen en eigen iconenbibliotheek downloaden. **Back-up downloaden (incl. iconen)** bewaart de volledige planner en de afbeeldingsgegevens van eigen iconen in een JSON-bestand.
+
+Via **Ouderportaal → Zelf aanpassen** wijzig je de standaard iconenweergave, het aantal rijen (2 of 3) en welke hoofdonderdelen zichtbaar zijn. De bestaande beheerpagina's blijven beschikbaar voor gezinskleuren, activiteiten, categorieën en eigen iconen. Nieuwe soorten functionaliteit die nog geen insteloptie hebben, vragen nog steeds om een softwarewijziging.
