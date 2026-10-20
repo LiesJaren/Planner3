@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { MemberAvatar } from './MemberAvatar';
 import {
   X,
   Printer,
@@ -1590,7 +1591,7 @@ const PrintableWeekSheet: React.FC<PrintableWeekSheetProps> = ({
                   key={m.id}
                   className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-full text-[7.5px] font-bold border border-slate-200 bg-slate-50"
                 >
-                  <span>{m.avatar}</span>
+                  <MemberAvatar avatar={m.avatar} name={m.name} />
                   <span className="truncate max-w-[50px] font-extrabold">{m.name.split(' ')[0]}</span>
                   <span
                     className="w-1.5 h-1.5 rounded-full inline-block shrink-0"

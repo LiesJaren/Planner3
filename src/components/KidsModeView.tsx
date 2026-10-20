@@ -9,6 +9,7 @@ import kidsMascotImg from '../assets/images/kids_mode_mascot_1791799911638.jpg';
 import { RewardsView } from './RewardsView';
 import { MilestoneBadgesSection } from './MilestoneBadgesSection';
 import { MILESTONE_BADGES, getNextMilestone } from '../data/milestoneBadges';
+import { MemberAvatar } from './MemberAvatar';
 
 interface KidsModeViewProps {
   events: AgendaEvent[];
@@ -262,7 +263,7 @@ export const KidsModeView: React.FC<KidsModeViewProps> = ({
                     : 'bg-white text-slate-800 hover:bg-amber-100'
                 }`}
               >
-                <span className="text-lg">{k.avatar}</span>
+                <span className="text-lg"><MemberAvatar avatar={k.avatar} name={k.name} /></span>
                 <span>{k.name}</span>
                 <span className="px-1 py-0.5 rounded-md bg-white/40 text-[10px] font-black">
                   ⭐ {k.stars || 0}

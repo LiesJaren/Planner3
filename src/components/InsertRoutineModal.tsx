@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { MemberAvatar } from './MemberAvatar';
 import {
   X,
   Sparkles,
@@ -1015,10 +1016,10 @@ export const InsertRoutineModal: React.FC<InsertRoutineModalProps> = ({
                         >
                           <div className="flex items-center gap-2">
                             <span
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shadow-2xs"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shadow-2xs overflow-hidden"
                               style={{ backgroundColor: m.color }}
                             >
-                              {m.avatar}
+                              <MemberAvatar avatar={m.avatar} name={m.name} className="w-full h-full object-cover rounded-lg" />
                             </span>
                             <span className="text-xs">{m.name}</span>
                           </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { MemberAvatar, isImageAvatar } from './MemberAvatar';
 import {
   ShieldCheck,
   Star,
@@ -590,8 +591,8 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
           <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-3xl p-6 text-white shadow-lg border-3 border-amber-300">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-white text-slate-900 border-3 border-amber-200 shadow-md flex items-center justify-center text-5xl">
-                  {childMember?.avatar || '👦'}
+                <div className="w-20 h-20 rounded-2xl bg-white text-slate-900 border-3 border-amber-200 shadow-md flex items-center justify-center text-5xl overflow-hidden">
+                  <MemberAvatar avatar={childMember?.avatar} name={childMember?.name} fallback="👦" className="w-full h-full object-cover rounded-2xl" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -860,7 +861,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                             : 'bg-slate-50 text-slate-700 border-slate-200'
                         }`}
                       >
-                        <span>{p.avatar}</span>
+                        <MemberAvatar avatar={p.avatar} name={p.name} />
                         <span>{p.name}</span>
                       </button>
                     ))}
@@ -1134,7 +1135,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                 <option value="all">Iedereen in gezin</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.avatar} {m.name}
+                    {isImageAvatar(m.avatar) ? '🦸' : m.avatar} {m.name}
                   </option>
                 ))}
               </select>
@@ -1218,11 +1219,11 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                           {evMembers.map((m) => (
                             <span
                               key={m.id}
-                              className="w-6 h-6 rounded-full border border-white flex items-center justify-center text-xs shadow-2xs"
+                              className="w-6 h-6 rounded-full border border-white flex items-center justify-center text-xs shadow-2xs overflow-hidden"
                               style={{ backgroundColor: m.color }}
                               title={m.name}
                             >
-                              {m.avatar}
+                              <MemberAvatar avatar={m.avatar} name={m.name} className="w-full h-full object-cover rounded-full" />
                             </span>
                           ))}
                         </div>
@@ -1617,10 +1618,10 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl border-2 border-white shadow-xs"
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl border-2 border-white shadow-xs overflow-hidden"
                       style={{ backgroundColor: m.color }}
                     >
-                      {m.avatar}
+                      <MemberAvatar avatar={m.avatar} name={m.name} className="w-full h-full object-cover rounded-2xl" />
                     </span>
                     <div>
                       <h4 className="text-sm font-black text-slate-900">{m.name}</h4>

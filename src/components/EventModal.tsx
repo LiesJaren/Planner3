@@ -6,6 +6,7 @@ import { IconPickerModal } from './IconPickerModal';
 import { getTodayDateStr, formatDutchFullDate, addDays, getWeekDaysList } from '../utils/dateUtils';
 import { soundEffects } from '../utils/audio';
 import { IconVisual } from './IconVisual';
+import { MemberAvatar } from './MemberAvatar';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -287,7 +288,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                           : 'border-slate-100 bg-slate-50 opacity-60 hover:opacity-100 hover:bg-white'
                       }`}
                     >
-                      <span className="text-xl">{member.avatar}</span>
+                      <span className="text-xl"><MemberAvatar avatar={member.avatar} name={member.name} /></span>
                       <div className="overflow-hidden">
                         <span className="text-xs font-bold text-slate-800 block truncate">
                           {member.name}

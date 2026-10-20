@@ -42,6 +42,7 @@ import { soundEffects, spreekBericht } from './utils/audio';
 import { getTodayDateStr, addDays, getWeekMonday } from './utils/dateUtils';
 import { ACTIVITY_ICONS } from './data/iconLibrary';
 import { FAMILY_SEED_ICONS } from './data/familySeedIcons';
+import { JAREN_SUPERHELD_AVATAR } from './data/jarenAvatar';
 import familyBannerImg from './assets/images/family_banner.jpg';
 
 const DEFAULT_MEMBERS: FamilyMember[] = [
@@ -153,6 +154,13 @@ function getPlannerId(): string {
   return plannerId;
 }
 
+const applyJarenAvatar = (list: FamilyMember[]): FamilyMember[] =>
+  list.map((member) =>
+    member.role === 'kind' && (member.avatar === '👦' || !member.avatar)
+      ? { ...member, avatar: JAREN_SUPERHELD_AVATAR }
+      : member,
+  );
+
 export default function App() {
   const plannerId = getPlannerId();
   const plannerApiUrl = `/api/planner?planner=${encodeURIComponent(plannerId)}`;
@@ -163,7 +171,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'agenda' | 'kids' | 'ouders' | 'boodschappen'>('agenda');
 
   const [members, setMembers] = useState<FamilyMember[]>(() => {
-    return loadStoredArray<FamilyMember>('fp_members', 'familieplanner_members_v2') ?? DEFAULT_MEMBERS;
+    return applyJarenAvatar(loadStoredArray<FamilyMember>('fp_members', 'familieplanner_members_v2') ?? DEFAULT_MEMBERS);
   });
 
   const [events, setEvents] = useState<AgendaEvent[]>(() => {
@@ -310,7 +318,7 @@ export default function App() {
   plannerDataRef.current = plannerData;
 
   const applyPlannerData = (data: PlannerData) => {
-    setMembers(data.members);
+    setMembers(applyJarenAvatar(data.members));
     setEvents(data.events);
     setGroceries(data.groceries);
     setRewards(data.rewards);

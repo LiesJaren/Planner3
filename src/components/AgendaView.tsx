@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { MemberAvatar } from './MemberAvatar';
 import {
   ChevronLeft,
   ChevronRight,
@@ -795,7 +796,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     backgroundColor: isSelected ? member.color : undefined,
                   }}
                 >
-                  <span>{member.avatar}</span>
+                  <MemberAvatar avatar={member.avatar} name={member.name} />
                   <span>{member.name.split(' ')[0]}</span>
                 </button>
               );
@@ -1770,7 +1771,7 @@ const EventCard: React.FC<EventCardProps> = ({
                     }}
                     title={m.name}
                   >
-                    <span>{m.avatar}</span>
+                    <MemberAvatar avatar={m.avatar} name={m.name} />
                     <span className="hidden sm:inline">{m.name.split(' ')[0]}</span>
                   </span>
                 ))
