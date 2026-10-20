@@ -41,6 +41,7 @@ import { IconPickerModal } from './components/IconPickerModal';
 import { soundEffects, spreekBericht } from './utils/audio';
 import { getTodayDateStr, addDays, getWeekMonday } from './utils/dateUtils';
 import { ACTIVITY_ICONS } from './data/iconLibrary';
+import { FAMILY_SEED_ICONS } from './data/familySeedIcons';
 import familyBannerImg from './assets/images/family_banner.jpg';
 
 const DEFAULT_MEMBERS: FamilyMember[] = [
@@ -248,12 +249,44 @@ export default function App() {
   });
 
   const [customIcons, setCustomIcons] = useState<ActivityIcon[]>(() => {
-    return loadStoredArray<ActivityIcon>('fp_custom_icons', 'familieplanner_custom_icons_v2') ?? [];
+    const storedIcons = loadStoredArray<ActivityIcon>('fp_custom_icons', 'familieplanner_custom_icons_v2') ?? [];
+    // Seed de gezinsbibliotheek eenmalig wanneer deze browser nog geen eigen iconen heeft.
+    if (storedIcons.length === 0 && FAMILY_SEED_ICONS.length > 0) {
+      return [...FAMILY_SEED_ICONS];
+    }
+    return storedIcons;
   });
 
   const [customCategories, setCustomCategories] = useState<IconCategoryMeta[]>(() => {
     return loadStoredArray<IconCategoryMeta>('fp_custom_categories', 'familieplanner_custom_cats_v2') ?? [];
   });
+
+  const [customRoutines, setCustomRoutines] = useState<RoutineTemplate[]>(() => {
+    return loadStoredArray<RoutineTemplate>('fp_custom_routines', 'familieplanner_custom_routines_v2') ?? [];
+  });
+
+  const handleSaveCustomRoutine = (template: RoutineTemplate): boolean => {
+    const next = [...customRoutines.filter((item) => item.id !== template.id), template];
+    try {
+      localStorage.setItem('fp_custom_routines', JSON.stringify(next));
+      setCustomRoutines(next);
+      return true;
+    } catch (error) {
+      console.error('Routine kon niet worden opgeslagen:', error);
+      return false;
+    }
+  };
+
+  const handleDeleteCustomRoutine = (templateId: string): void => {
+    const next = customRoutines.filter((item) => item.id !== templateId);
+    try {
+      localStorage.setItem('fp_custom_routines', JSON.stringify(next));
+      setCustomRoutines(next);
+    } catch (error) {
+      console.error('Routine kon niet worden verwijderd:', error);
+    }
+  };
+
   const [preferences, setPreferences] = useState<PlannerPreferences>(() => {
     try {
       const saved = localStorage.getItem('fp_preferences');
@@ -346,6 +379,7 @@ export default function App() {
       localStorage.setItem('fp_rewards', JSON.stringify(rewards));
       localStorage.setItem('fp_custom_icons', JSON.stringify(customIcons));
       localStorage.setItem('fp_custom_categories', JSON.stringify(customCategories));
+      localStorage.setItem('fp_custom_routines', JSON.stringify(customRoutines));
       localStorage.setItem('fp_preferences', JSON.stringify(preferences));
     } catch (error) {
       console.warn('Could not save planner data to local storage:', error);
@@ -1131,6 +1165,7 @@ export default function App() {
         initialSourceDate={copySourceDate}
         initialSelectedEventId={copyEventId}
         onBatchCopyEvents={handleBatchInsertEvents}
+        onSaveCustomRoutine={handleSaveCustomRoutine}
         onClose={() => setIsCopyModalOpen(false)}
       />
 
@@ -1139,6 +1174,11 @@ export default function App() {
         defaultDate={routineTargetDate}
         members={members}
         customIcons={customIcons}
+        customCategories={customCategories}
+        onOpenCreateIconModal={() => setIsCreateIconModalOpen(true)}
+        customTemplates={customRoutines}
+        onSaveCustomTemplate={handleSaveCustomRoutine}
+        onDeleteCustomTemplate={handleDeleteCustomRoutine}
         onBatchInsertEvents={handleBatchInsertEvents}
         onClose={() => setIsInsertRoutineModalOpen(false)}
       />
